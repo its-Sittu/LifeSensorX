@@ -25,6 +25,11 @@ const App: React.FC = () => {
     }
   }, [location.latitude, location.longitude, setEmergencyLocation]);
 
+  // Warm up the backend API on load (to wake up Render from sleep)
+  useEffect(() => {
+    fetch('https://lifesensorx.onrender.com').catch(() => {});
+  }, []);
+
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30">
       

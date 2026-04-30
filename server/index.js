@@ -117,4 +117,12 @@ app.get('/', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Emergency Server running on http://0.0.0.0:${PORT}`);
   console.log(`🔗 Accessible at http://10.17.171.188:${PORT}`);
+  
+  // Keep-alive logic: Ping itself every 14 minutes
+  const URL = `https://lifesensorx.onrender.com`;
+  setInterval(() => {
+    fetch(URL)
+      .then(() => console.log('Self-ping successful: Keeping the engine warm!'))
+      .catch(err => console.error('Self-ping failed:', err.message));
+  }, 14 * 60 * 1000); // 14 minutes
 });
