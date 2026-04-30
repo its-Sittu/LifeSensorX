@@ -96,7 +96,8 @@ app.post('/send-alert', async (req, res) => {
         failedCount: failed
       });
     } else {
-      throw new Error("All SMS attempts failed.");
+      const firstError = sendResults.find(r => r.status === 'rejected')?.reason?.message || "All attempts failed";
+      throw new Error(firstError);
     }
 
   } catch (error) {

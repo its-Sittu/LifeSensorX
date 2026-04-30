@@ -95,10 +95,11 @@ const EmergencyModal: React.FC = () => {
       showPopup("Emergency background alerts sent successfully!");
       setIsSending(false);
       cancelEmergency(); // Close modal on total success
-    } catch (error) {
+    } catch (error: any) {
       console.error('Backend dispatch failed:', error);
       setIsSending(false);
-      showPopup("Background SMS failed. Choose a manual method.", 'info');
+      const errorMsg = error.message || "Unknown error";
+      showPopup(`Background alert failed: ${errorMsg}`, 'info');
       setShowSelection(true); // Fallback to manual selection
     }
   };
