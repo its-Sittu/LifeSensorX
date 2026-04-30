@@ -56,7 +56,7 @@ const App: React.FC = () => {
               <ShieldAlert size={22} className="text-white drop-shadow-lg" />
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-              <span className="text-cyan-400">Life</span>SensorX
+              <span className="text-cyan-400">Life</span>SensorX <span className="text-[10px] text-zinc-600 font-mono align-top ml-1">v1.2</span>
             </h1>
           </div>
           <div className="w-8 h-8 rounded-full border border-zinc-800 flex items-center justify-center">
