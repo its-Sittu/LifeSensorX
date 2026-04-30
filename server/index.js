@@ -1,5 +1,5 @@
 const express = require('express');
-const twilio = require('twilio');
+const axios = require('axios');
 const dotenv = require('dotenv');
 const cors = require('cors');
 
@@ -13,22 +13,15 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Request Logger (Debug)
+// Request Logger
 app.use((req, res, next) => {
-  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url} from ${req.ip}`);
+  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
   next();
 });
 
-// Twilio Client Initialization
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
-
 /**
- * API Endpoint to send emergency alerts
- * Method: POST
- * Body: { contacts: [], latitude: "", longitude: "" }
+ * API Endpoint: /send-alert
+ * Purpose: Sends emergency SMS via Fast2SMS
  */
 app.post('/send-alert', async (req, res) => {
   try {
@@ -36,91 +29,80 @@ app.post('/send-alert', async (req, res) => {
 
     // 1. Validation
     if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
-      return res.status(400).json({ success: false, error: "Contacts array is required." });
+      return res.status(400).json({ 
+        success: false, 
+        error: "Contacts array is required." 
+      });
     }
 
     if (contacts.length > 5) {
-      return res.status(400).json({ success: false, error: "Maximum 5 contacts allowed for security." });
+      return res.status(400).json({ 
+        success: false, 
+        error: "Maximum 5 contacts allowed for safety." 
+      });
     }
 
     if (!latitude || !longitude) {
-      return res.status(400).json({ success: false, error: "Location data (lat/long) is missing." });
+      return res.status(400).json({ 
+        success: false, 
+        error: "Location coordinates (lat/long) are missing." 
+      });
     }
 
-    // 2. Generate Message (Simplified for testing)
+    // 2. Format Phone Numbers (Fast2SMS expects comma separated string)
+    // Ensure numbers are clean (digits only)
+    const formattedNumbers = contacts.map(num => num.replace(/\D/g, '')).join(',');
+
+    // 3. Generate Dynamic Emergency Message
     const mapsLink = `https://maps.google.com/?q=${latitude},${longitude}`;
-    const messageBody = `Emergency Alert! Accident detected. Location: ${mapsLink}`;
+    const messageBody = `🚨 Emergency Alert!\nPossible accident detected.\n\n📍 Location:\n${mapsLink}\n\nPlease help immediately.`;
 
-    console.log(`Sending alerts to ${contacts.length} numbers...`);
+    console.log(`Sending Emergency SMS to: ${formattedNumbers}`);
 
-    // 3. Send SMS and Voice Call to each contact
-    const sendResults = await Promise.allSettled(
-      contacts.flatMap(number => {
-        const cleanNumber = number.startsWith('+') ? number : `+91${number}`;
-        console.log(`Triggering SMS and Call for: ${cleanNumber}`);
-        
-        return [
-          // SMS Trigger
-          client.messages.create({
-            body: messageBody,
-            from: process.env.TWILIO_PHONE_NUMBER,
-            to: cleanNumber
-          }),
-          // Voice Call Trigger
-          client.calls.create({
-            twiml: `<Response><Say voice="alice">Emergency! Life Sensor X detected an accident. Check SMS for location.</Say></Response>`,
-            from: process.env.TWILIO_PHONE_NUMBER,
-            to: cleanNumber
-          })
-        ];
-      }).flat()
-    );
+    // 4. Fast2SMS Integration
+    const response = await axios.post('https://www.fast2sms.com/dev/bulkV2', {
+      route: "q",
+      message: messageBody,
+      language: "english",
+      numbers: formattedNumbers,
+    }, {
+      headers: {
+        'authorization': process.env.FAST2SMS_API_KEY,
+        'Content-Type': 'application/json',
+      }
+    });
 
-    // 4. Analyze Results
-    const successful = sendResults.filter(r => r.status === 'fulfilled').length;
-    const failed = sendResults.filter(r => r.status === 'rejected').length;
-
-    console.log(`Results - Success: ${successful}, Failed: ${failed}`);
-    
-    if (successful > 0) {
+    // 5. Handle Fast2SMS Response
+    if (response.data && response.data.return === true) {
+      console.log('✅ SMS sent successfully:', response.data.message);
       return res.status(200).json({
         success: true,
-        message: `Alerts sent to ${successful} contacts.`,
-        failedCount: failed
+        message: "Emergency alerts dispatched successfully via Fast2SMS.",
+        request_id: response.data.request_id
       });
     } else {
-      const error = sendResults.find(r => r.status === 'rejected')?.reason;
-      const errorMsg = error?.message || "Unknown error";
-      const errorCode = error?.code || "No code";
-      throw new Error(`Twilio Error ${errorCode}: ${errorMsg}`);
+      console.error('❌ Fast2SMS error:', response.data);
+      throw new Error(response.data.message || "Fast2SMS failed to send message");
     }
 
   } catch (error) {
-    console.error("Server Error:", error.message);
+    const errorMsg = error.response?.data?.message || error.message || "Internal Server Error";
+    console.error("Critical Backend Error:", errorMsg);
+    
     return res.status(500).json({
       success: false,
-      error: error.message || "Internal Server Error"
+      error: errorMsg
     });
   }
 });
 
 // Health Check
 app.get('/', (req, res) => {
-  res.send("LifeSensorX Emergency API is Running... (v2.1 - Debug Enabled)");
+  res.send("LifeSensorX Emergency API (Fast2SMS Edition) is running...");
 });
 
-// Listen on all interfaces
+// Start Server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Emergency Server running on http://0.0.0.0:${PORT}`);
-  console.log(`🔗 Accessible at http://10.17.171.188:${PORT}`);
-  
-  // Keep-alive logic: Ping itself every 14 minutes
-  const https = require('https');
-  setInterval(() => {
-    https.get('https://lifesensorx.onrender.com', (res) => {
-      console.log('Self-ping successful: Keeping the engine warm!');
-    }).on('error', (err) => {
-      console.error('Self-ping failed:', err.message);
-    });
-  }, 14 * 60 * 1000); // 14 minutes
+  console.log(`🚀 Emergency Backend running on port ${PORT}`);
+  console.log(`🔗 Fast2SMS integration active.`);
 });
