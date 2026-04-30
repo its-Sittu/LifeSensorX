@@ -70,19 +70,19 @@ const ContactsManager: React.FC = () => {
         <form onSubmit={handleAdd} className="glass-card p-4 flex flex-col gap-3">
           <input 
             type="text" 
-            placeholder="Contact Name" 
+            placeholder="Name (e.g. Mom)" 
             value={name}
             onChange={e => setName(e.target.value)}
             required
-            className="w-full bg-zinc-900/50 border border-zinc-700/50 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+            className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/50 transition-colors"
           />
           <input 
             type="tel" 
-            placeholder="Phone Number (e.g. +1234567890)" 
+            placeholder="Phone Number (10 digits)" 
             value={phone}
             onChange={e => setPhone(e.target.value)}
             required
-            className="w-full bg-zinc-900/50 border border-zinc-700/50 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+            className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/50 transition-colors"
           />
           <div className="flex gap-2 mt-2">
             <button 
