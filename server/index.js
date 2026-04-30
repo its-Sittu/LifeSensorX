@@ -55,16 +55,25 @@ app.post('/send-alert', async (req, res) => {
 
     // 3. Send SMS to each contact
     const sendResults = await Promise.allSettled(
-      contacts.map(number => 
-        client.messages.create({
+      contacts.map(number => {
+        const cleanNumber = number.startsWith('+') ? number : `+91${number}`;
+        console.log(`Attempting SMS to: ${cleanNumber}`);
+        return client.messages.create({
           body: messageBody,
           from: process.env.TWILIO_PHONE_NUMBER,
-          to: number
-        })
-      )
+          to: cleanNumber
+        });
+      })
     );
 
     // 4. Analyze Results
+    sendResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error(`❌ SMS to ${contacts[index]} failed:`, result.reason.message);
+      } else {
+        console.log(`✅ SMS to ${contacts[index]} sent: ${result.value.sid}`);
+      }
+    });
     const successful = sendResults.filter(r => r.status === 'fulfilled').length;
     const failed = sendResults.filter(r => r.status === 'rejected').length;
 

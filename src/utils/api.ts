@@ -10,11 +10,7 @@ export const sendEmergencySMS = async (contacts: Contact[], location: LocationDa
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        // Extract just the phone numbers from the contact objects
-        contacts: contacts.map(c => {
-          const clean = c.phone.replace(/\D/g, '');
-          return clean.length === 10 ? `+91${clean}` : `+${clean}`;
-        }),
+        contacts: contacts.map(c => c.phone),
         latitude: location.latitude,
         longitude: location.longitude,
       }),
