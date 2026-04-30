@@ -47,9 +47,9 @@ app.post('/send-alert', async (req, res) => {
       return res.status(400).json({ success: false, error: "Location data (lat/long) is missing." });
     }
 
-    // 2. Generate Message
+    // 2. Generate Message (Simplified for testing)
     const mapsLink = `https://maps.google.com/?q=${latitude},${longitude}`;
-    const messageBody = `🚨 Emergency Alert!\nA possible accident has been detected.\n\n📍 Location:\n${mapsLink}\n\nPlease help immediately.`;
+    const messageBody = `Emergency Alert! Accident detected. Location: ${mapsLink}`;
 
     console.log(`Sending alerts to ${contacts.length} numbers...`);
 
@@ -68,7 +68,7 @@ app.post('/send-alert', async (req, res) => {
           }),
           // Voice Call Trigger
           client.calls.create({
-            twiml: `<Response><Say voice="alice">Emergency Alert! Life Sensor X has detected a possible accident involving your contact. Please check your text messages immediately for their live location. I repeat, check your messages now!</Say></Response>`,
+            twiml: `<Response><Say voice="alice">Emergency! Life Sensor X detected an accident. Check SMS for location.</Say></Response>`,
             from: process.env.TWILIO_PHONE_NUMBER,
             to: cleanNumber
           })
@@ -82,13 +82,6 @@ app.post('/send-alert', async (req, res) => {
 
     console.log(`Results - Success: ${successful}, Failed: ${failed}`);
     
-    // Log failures for debugging
-    sendResults.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.error(`❌ Attempt failed:`, result.reason.message);
-      }
-    });
-
     if (successful > 0) {
       return res.status(200).json({
         success: true,
@@ -96,8 +89,10 @@ app.post('/send-alert', async (req, res) => {
         failedCount: failed
       });
     } else {
-      const firstError = sendResults.find(r => r.status === 'rejected')?.reason?.message || "All attempts failed";
-      throw new Error(firstError);
+      const error = sendResults.find(r => r.status === 'rejected')?.reason;
+      const errorMsg = error?.message || "Unknown error";
+      const errorCode = error?.code || "No code";
+      throw new Error(`Twilio Error ${errorCode}: ${errorMsg}`);
     }
 
   } catch (error) {
