@@ -1,6 +1,6 @@
 import { LocationData, Contact } from '../store/useEmergencyStore';
 
-const BACKEND_URL = 'https://eager-files-wonder.loca.lt';
+const BACKEND_URL = 'https://lifesensorx-production.up.railway.app';
 
 export const sendEmergencySMS = async (contacts: Contact[], location: LocationData) => {
   try {
