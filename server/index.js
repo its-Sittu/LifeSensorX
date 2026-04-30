@@ -53,31 +53,41 @@ app.post('/send-alert', async (req, res) => {
 
     console.log(`Sending alerts to ${contacts.length} numbers...`);
 
-    // 3. Send SMS to each contact
+    // 3. Send SMS and Voice Call to each contact
     const sendResults = await Promise.allSettled(
-      contacts.map(number => {
+      contacts.flatMap(number => {
         const cleanNumber = number.startsWith('+') ? number : `+91${number}`;
-        console.log(`Attempting SMS to: ${cleanNumber}`);
-        return client.messages.create({
-          body: messageBody,
-          from: process.env.TWILIO_PHONE_NUMBER,
-          to: cleanNumber
-        });
-      })
+        console.log(`Triggering SMS and Call for: ${cleanNumber}`);
+        
+        return [
+          // SMS Trigger
+          client.messages.create({
+            body: messageBody,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: cleanNumber
+          }),
+          // Voice Call Trigger
+          client.calls.create({
+            twiml: `<Response><Say voice="alice">Emergency Alert! Life Sensor X has detected a possible accident involving your contact. Please check your text messages immediately for their live location. I repeat, check your messages now!</Say></Response>`,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: cleanNumber
+          })
+        ];
+      }).flat()
     );
 
     // 4. Analyze Results
-    sendResults.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.error(`❌ SMS to ${contacts[index]} failed:`, result.reason.message);
-      } else {
-        console.log(`✅ SMS to ${contacts[index]} sent: ${result.value.sid}`);
-      }
-    });
     const successful = sendResults.filter(r => r.status === 'fulfilled').length;
     const failed = sendResults.filter(r => r.status === 'rejected').length;
 
     console.log(`Results - Success: ${successful}, Failed: ${failed}`);
+    
+    // Log failures for debugging
+    sendResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error(`❌ Attempt failed:`, result.reason.message);
+      }
+    });
 
     if (successful > 0) {
       return res.status(200).json({
