@@ -106,7 +106,7 @@ app.post('/send-alert', async (req, res) => {
 
 // Health Check
 app.get('/', (req, res) => {
-  res.send("LifeSensorX Emergency API is Running...");
+  res.send("LifeSensorX Emergency API is Running... (v2.1 - Debug Enabled)");
 });
 
 // Listen on all interfaces
