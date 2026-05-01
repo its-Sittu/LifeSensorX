@@ -100,7 +100,7 @@ app.post('/send-alert', async (req, res) => {
  */
 app.get('/nearby-hospitals', async (req, res) => {
   const { lat, lng } = req.query;
-  console.log(`[DEBUG] Fetching hospitals for: ${lat}, ${lng}`);
+  console.log(`[DEBUG] Fetching hospitals with phone numbers for: ${lat}, ${lng}`);
 
   if (!lat || !lng) {
     return res.status(400).json({ success: false, error: "Lat/Lng required" });
@@ -108,28 +108,46 @@ app.get('/nearby-hospitals', async (req, res) => {
 
   const API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
-  // 1. Try Google Places API first
+  // 1. Try Google Places API (Two-step fetch for phone numbers)
   if (API_KEY && API_KEY !== 'your_google_maps_key_here') {
     try {
-      console.log(`[DEBUG] Attempting Google Places API...`);
+      console.log(`[DEBUG] Step 1: Google Nearby Search...`);
       const googleUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=10000&type=hospital&key=${API_KEY}`;
       const response = await axios.get(googleUrl);
 
       if (response.data.status === 'OK') {
-        const hospitals = response.data.results.map(place => ({
-          name: place.name,
-          address: place.vicinity,
-          location: place.geometry.location,
+        const top5 = response.data.results.slice(0, 5);
+        
+        // Step 2: Fetch Details for each to get phone number
+        const detailedHospitals = await Promise.all(top5.map(async (place) => {
+          try {
+            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=formatted_phone_number&key=${API_KEY}`;
+            const detailsRes = await axios.get(detailsUrl);
+            return {
+              name: place.name,
+              address: place.vicinity,
+              location: place.geometry.location,
+              phone: detailsRes.data.result?.formatted_phone_number || null
+            };
+          } catch (err) {
+            console.error(`[ERROR] Details fetch failed for ${place.name}:`, err.message);
+            return {
+              name: place.name,
+              address: place.vicinity,
+              location: place.geometry.location,
+              phone: null
+            };
+          }
         }));
-        return res.status(200).json({ success: true, source: 'google', results: hospitals });
+
+        return res.status(200).json({ success: true, source: 'google', results: detailedHospitals });
       }
-      console.warn(`[WARN] Google API Status: ${response.data.status}`);
     } catch (err) {
-      console.error(`[ERROR] Google API Failed:`, err.message);
+      console.error(`[ERROR] Google API Flow Failed:`, err.message);
     }
   }
 
-  // 2. Fallback to OpenStreetMap
+  // 2. Fallback to OpenStreetMap (No phone numbers available in basic Overpass node search easily)
   try {
     console.log(`[DEBUG] Falling back to OpenStreetMap...`);
     const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:10000,${lat},${lng})["amenity"="hospital"];out;`;
@@ -140,7 +158,8 @@ app.get('/nearby-hospitals', async (req, res) => {
         name: place.tags.name || "Nearby Medical Center",
         address: place.tags["addr:full"] || "Emergency Services",
         location: { lat: place.lat, lng: place.lon },
-      })).slice(0, 10);
+        phone: null
+      })).slice(0, 5);
       return res.status(200).json({ success: true, source: 'openstreetmap', results: hospitals });
     }
   } catch (err) {
@@ -152,8 +171,8 @@ app.get('/nearby-hospitals', async (req, res) => {
     success: true,
     source: 'mock',
     results: [
-      { name: "City Hospital (Demo)", address: "Medical Zone A", location: { lat: parseFloat(lat) + 0.01, lng: parseFloat(lng) + 0.01 } },
-      { name: "Global Trauma Center (Demo)", address: "Emergency Sector B", location: { lat: parseFloat(lat) - 0.01, lng: parseFloat(lng) - 0.01 } }
+      { name: "City General Hospital", address: "Medical Zone A", location: { lat: parseFloat(lat) + 0.01, lng: parseFloat(lng) + 0.01 }, phone: "+91 9999999999" },
+      { name: "Metro Trauma Center", address: "Emergency Sector B", location: { lat: parseFloat(lat) - 0.01, lng: parseFloat(lng) - 0.01 }, phone: "+91 8888888888" }
     ]
   });
 });

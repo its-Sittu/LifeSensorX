@@ -7,6 +7,16 @@ export interface Contact {
   phone: string;
 }
 
+export interface Hospital {
+  name: string;
+  address: string;
+  location: {
+    lat: number;
+    lng: number;
+  };
+  phone?: string | null;
+}
+
 export interface LocationData {
   latitude: number | null;
   longitude: number | null;

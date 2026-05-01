@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useEmergencyStore } from '../store/useEmergencyStore';
 import { fetchNearbyHospitals } from '../utils/api';
-import { HeartPulse, Navigation, Loader2 } from 'lucide-react';
+import { HeartPulse, Navigation, Loader2, Phone, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const HospitalList: React.FC = () => {
@@ -31,15 +31,14 @@ const HospitalList: React.FC = () => {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">Nearby Hospitals</h3>
-        {isLoading ? (
-          <Loader2 size={18} className="text-blue-400 animate-spin" />
-        ) : (
-          <HeartPulse size={18} className={isEmergencyMode ? "text-red-400 animate-pulse" : "text-zinc-500"} />
-        )}
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          Nearby Hospitals
+          {isEmergencyMode && <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+        </h3>
+        {isLoading && <Loader2 size={18} className="text-blue-400 animate-spin" />}
       </div>
 
-      <div className="flex flex-col gap-2 min-h-[100px]">
+      <div className="flex flex-col gap-3 min-h-[100px]">
         <AnimatePresence mode="popLayout">
           {error && (
             <motion.p 
@@ -52,31 +51,54 @@ const HospitalList: React.FC = () => {
           )}
 
           {!isLoading && hospitals.length === 0 && !error && (
-            <p className="text-sm text-zinc-500 italic p-4 text-center glass-card border-dashed">
-              {isEmergencyMode ? "Searching for nearby emergency centers..." : "Hospitals will appear here during emergency."}
-            </p>
+            <div className="p-8 bg-zinc-900/30 rounded-2xl border border-dashed border-zinc-800 flex flex-col items-center gap-2">
+              <HeartPulse size={24} className="text-zinc-700" />
+              <p className="text-sm text-zinc-500 text-center">
+                {isEmergencyMode ? "Scanning for medical help..." : "Hospitals will appear here during emergency."}
+              </p>
+            </div>
           )}
 
-          {hospitals.slice(0, 8).map((hospital, index) => (
+          {hospitals.slice(0, 5).map((hospital, index) => (
             <motion.div 
               key={hospital.name + index}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="glass-card p-4 flex items-center justify-between hover:bg-zinc-800/50 transition-colors group"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="glass-card p-4 hover:bg-zinc-800/40 transition-all border border-zinc-800/50"
             >
-              <div className="flex-1 mr-4">
-                <p className="text-sm font-medium text-white mb-1 group-hover:text-blue-400 transition-colors line-clamp-1">{hospital.name}</p>
-                <p className="text-[10px] text-zinc-500 line-clamp-1 uppercase tracking-wider">{hospital.address}</p>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <h4 className="text-white font-bold text-sm leading-tight">{hospital.name}</h4>
+                  <p className="text-zinc-500 text-[11px] mt-1 flex items-start gap-1">
+                    <MapPin size={12} className="shrink-0 mt-0.5" />
+                    {hospital.address}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {hospital.phone ? (
+                    <a 
+                      href={`tel:${hospital.phone.replace(/\s+/g, '')}`}
+                      className="flex-1 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition-all active:scale-95"
+                    >
+                      <Phone size={14} />
+                      Call Now
+                    </a>
+                  ) : (
+                    <div className="flex-1 py-2 rounded-lg bg-zinc-800/50 text-zinc-500 text-[10px] font-medium flex items-center justify-center italic">
+                      Phone Unavailable
+                    </div>
+                  )}
+                  <button 
+                    onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${hospital.location.lat},${hospital.location.lng}`, '_blank')}
+                    className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-blue-500 transition-all active:scale-95 shadow-[0_0_10px_rgba(37,99,235,0.2)]"
+                  >
+                    <Navigation size={14} />
+                    Directions
+                  </button>
+                </div>
               </div>
-              
-              <button 
-                onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${hospital.location.lat},${hospital.location.lng}`, '_blank')}
-                className="w-10 h-10 rounded-xl bg-zinc-800/80 border border-zinc-700 flex items-center justify-center text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/30 transition-all active:scale-90"
-                title="Navigate"
-              >
-                <Navigation size={18} />
-              </button>
             </motion.div>
           ))}
         </AnimatePresence>
