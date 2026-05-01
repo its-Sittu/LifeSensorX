@@ -14,7 +14,7 @@ export const useLiveLocation = () => {
   
   const watchIdRef = useRef<number | null>(null);
 
-  // Load from localStorage on mount
+  // Auto-start tracking if permission was previously granted or last_known_location exists
   useEffect(() => {
     const saved = localStorage.getItem('last_known_location');
     if (saved) {
@@ -22,11 +22,31 @@ export const useLiveLocation = () => {
         const parsed = JSON.parse(saved);
         if (parsed.latitude && parsed.longitude) {
           setLocation(parsed);
+          // Don't auto-start tracking here to avoid permission prompts on mount, 
+          // but we could if we check permissions API
         }
       } catch (e) {
         console.error('Failed to parse cached location', e);
       }
     }
+    
+    // Check if we can auto-start
+    const checkPermission = async () => {
+      if ('permissions' in navigator) {
+        try {
+          const result = await navigator.permissions.query({ name: 'geolocation' });
+          if (result.state === 'granted') {
+            startTracking();
+          }
+          result.onchange = () => {
+            if (result.state === 'granted') startTracking();
+          };
+        } catch (e) {
+          console.log('Permissions API not supported or failed');
+        }
+      }
+    };
+    checkPermission();
   }, []);
 
   const startTracking = () => {
@@ -44,31 +64,39 @@ export const useLiveLocation = () => {
       navigator.geolocation.clearWatch(watchIdRef.current);
     }
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const newLocation = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        };
-        setLocation(newLocation);
-        setStatus('active');
-        localStorage.setItem('last_known_location', JSON.stringify(newLocation));
-      },
-      (error) => {
-        // If HTML5 Geolocation fails (common on desktops without GPS/Wi-Fi), use IP fallback
-        if (error.code !== error.PERMISSION_DENIED) {
-          fetchIpLocationFallback();
-        } else {
-          setStatus('denied');
-          setErrorMsg('Location access denied by user.');
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 8000, // 8 seconds before trying fallback
-        maximumAge: 0,
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    };
+
+    const success = (position: GeolocationPosition) => {
+      const newLocation = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+      console.log('Location acquired:', newLocation);
+      setLocation(newLocation);
+      setStatus('active');
+      localStorage.setItem('last_known_location', JSON.stringify(newLocation));
+    };
+
+    const error = (err: GeolocationPositionError) => {
+      console.warn('Geolocation error:', err.message);
+      // If HTML5 Geolocation fails, use IP fallback
+      if (err.code !== err.PERMISSION_DENIED) {
+        fetchIpLocationFallback();
+      } else {
+        setStatus('denied');
+        setErrorMsg('Location access denied by user.');
       }
-    );
+    };
+
+    // First attempt a quick get current position for immediate response
+    navigator.geolocation.getCurrentPosition(success, error, options);
+
+    // Then start the watch for live updates
+    watchIdRef.current = navigator.geolocation.watchPosition(success, error, options);
   };
 
   const fetchIpLocationFallback = async () => {

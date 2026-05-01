@@ -60,7 +60,13 @@ const App: React.FC = () => {
             </h1>
           </div>
           <div className="w-8 h-8 rounded-full border border-zinc-800 flex items-center justify-center">
-            <div className={`w-2 h-2 rounded-full ${status === 'active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse' : 'bg-red-500'}`} />
+            <div className={`w-2 h-2 rounded-full ${
+              status === 'active' 
+                ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse' 
+                : status === 'loading'
+                ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-bounce'
+                : 'bg-red-500'
+            }`} />
           </div>
         </header>
 
