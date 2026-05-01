@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
 import CountdownTimer from './CountdownTimer';
 import AlertPopup from './AlertPopup';
+import HospitalList from './HospitalList';
 
 const COUNTDOWN_TIME = 10;
 
@@ -164,7 +165,7 @@ const EmergencyModal: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-red-950/95 backdrop-blur-xl"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-red-950/95 backdrop-blur-xl overflow-y-auto"
           >
             {/* Pulsing background */}
             <motion.div 
@@ -173,7 +174,7 @@ const EmergencyModal: React.FC = () => {
               className="absolute inset-0 bg-red-600/30 rounded-full blur-3xl pointer-events-none"
             />
 
-            <div className="relative z-10 w-full max-w-sm flex flex-col items-center text-center">
+            <div className="relative z-10 w-full max-w-sm flex flex-col items-center text-center py-8">
               <div className="w-20 h-20 mb-6 rounded-full bg-red-500 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.8)]">
                 <AlertTriangle size={40} className="text-white" />
               </div>
@@ -194,7 +195,12 @@ const EmergencyModal: React.FC = () => {
                     <CheckCircle size={28} />
                     I'M SAFE
                   </button>
-                  <p className="mt-4 text-sm text-red-300">Tap to cancel emergency alert</p>
+                  <p className="mt-4 text-sm text-red-300 mb-8">Tap to cancel emergency alert</p>
+                  
+                  {/* Nearby Hospitals Section during Countdown */}
+                  <div className="w-full text-left mt-4 border-t border-red-500/20 pt-8">
+                    <HospitalList />
+                  </div>
                 </>
               ) : (
                 <motion.div 

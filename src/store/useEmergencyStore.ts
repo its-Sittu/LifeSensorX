@@ -32,24 +32,27 @@ export const useEmergencyStore = create<EmergencyState>()(
         { id: '1', name: 'Emergency Monitor', phone: '+19897877228' }
       ],
       location: { latitude: null, longitude: null, error: null },
-      
+      hospitals: [],
+
       triggerEmergency: () => set({ isEmergencyMode: true }),
       cancelEmergency: () => set({ isEmergencyMode: false }),
-      
-      addContact: (contact) => 
+
+      addContact: (contact) =>
         set((state) => ({
           contacts: [...state.contacts, { ...contact, id: crypto.randomUUID() }].slice(0, 5)
         })),
-        
-      removeContact: (id) => 
+
+      removeContact: (id) =>
         set((state) => ({
           contacts: state.contacts.filter(c => c.id !== id)
         })),
-        
-      setLocation: (loc) => 
+
+      setLocation: (loc) =>
         set((state) => ({
           location: { ...state.location, ...loc }
-        }))
+        })),
+
+      setHospitals: (hospitals) => set({ hospitals })
     }),
     {
       name: 'lifesensorx-storage',

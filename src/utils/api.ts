@@ -30,3 +30,19 @@ export const sendEmergencySMS = async (contacts: Contact[], location: LocationDa
     throw error;
   }
 };
+
+export const fetchNearbyHospitals = async (lat: number, lng: number) => {
+  try {
+    const response = await fetch(`${BACKEND_URL}/nearby-hospitals?lat=${lat}&lng=${lng}`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch hospitals');
+    }
+
+    return data.results;
+  } catch (error) {
+    console.error('Hospitals API Error:', error);
+    throw error;
+  }
+};
