@@ -115,6 +115,11 @@ app.get('/nearby-hospitals', async (req, res) => {
       const googleUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=10000&type=hospital&key=${API_KEY}`;
       const response = await axios.get(googleUrl);
 
+      console.log(`[DEBUG] Google API Status: ${response.data.status}`);
+      if (response.data.error_message) {
+        console.log(`[DEBUG] Google API Error: ${response.data.error_message}`);
+      }
+
       if (response.data.status === 'OK') {
         const top5 = response.data.results.slice(0, 5);
         
@@ -151,7 +156,12 @@ app.get('/nearby-hospitals', async (req, res) => {
   try {
     console.log(`[DEBUG] Falling back to OpenStreetMap...`);
     const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:10000,${lat},${lng})["amenity"="hospital"];out;`;
-    const response = await axios.get(overpassUrl, { timeout: 8000 });
+    const response = await axios.get(overpassUrl, { 
+      timeout: 8000,
+      headers: {
+        'User-Agent': 'LifeSensorX-Emergency-App/1.0'
+      }
+    });
 
     if (response.data && response.data.elements) {
       const hospitals = response.data.elements.map(place => ({
@@ -171,8 +181,8 @@ app.get('/nearby-hospitals', async (req, res) => {
     success: true,
     source: 'mock',
     results: [
-      { name: "City General Hospital", address: "Medical Zone A", location: { lat: parseFloat(lat) + 0.01, lng: parseFloat(lng) + 0.01 }, phone: "+91 9999999999" },
-      { name: "Metro Trauma Center", address: "Emergency Sector B", location: { lat: parseFloat(lat) - 0.01, lng: parseFloat(lng) - 0.01 }, phone: "+91 8888888888" }
+      { name: "City General Hospital (Mock)", address: "Medical Zone A", location: { lat: parseFloat(lat) + 0.01, lng: parseFloat(lng) + 0.01 }, phone: "+91 9999999999" },
+      { name: "Metro Trauma Center (Mock)", address: "Emergency Sector B", location: { lat: parseFloat(lat) - 0.01, lng: parseFloat(lng) - 0.01 }, phone: "+91 8888888888" }
     ]
   });
 });
