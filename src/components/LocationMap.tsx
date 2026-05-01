@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigation, Map, AlertTriangle, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { LocationStatus } from '../hooks/useLocation';
 
 interface LocationState {
   latitude: number | null;
@@ -8,7 +9,7 @@ interface LocationState {
 }
 
 interface Props {
-  status: 'idle' | 'loading' | 'active' | 'error' | 'denied';
+  status: LocationStatus;
   location: LocationState;
   errorMsg: string | null;
 }
@@ -36,6 +37,11 @@ const LocationMap: React.FC<Props> = ({ status, location, errorMsg }) => {
             <>
               <Loader2 size={12} className="text-blue-400 animate-spin" />
               <span className="text-xs font-medium text-blue-400">Acquiring...</span>
+            </>
+          ) : status === 'unavailable' ? (
+            <>
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
+              <span className="text-xs font-medium text-amber-500">GPS Off</span>
             </>
           ) : (
             <>
@@ -79,7 +85,7 @@ const LocationMap: React.FC<Props> = ({ status, location, errorMsg }) => {
           </>
         )}
 
-        {(status === 'error' || status === 'denied') && (
+        {(status === 'error' || status === 'denied' || status === 'unavailable') && (
           <div className="flex flex-col items-center gap-2 text-red-400 z-10 px-4 text-center">
             <AlertTriangle size={32} />
             <p className="text-sm font-medium">{errorMsg || 'Location Unavailable'}</p>

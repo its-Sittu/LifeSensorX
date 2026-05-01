@@ -6,15 +6,15 @@ import EmergencyModal from './components/EmergencyModal';
 import LocationMap from './components/LocationMap';
 import LocationPermissionModal from './components/LocationPermissionModal';
 import { ShieldAlert, MapPin } from 'lucide-react';
-import { useLiveLocation } from './hooks/useLiveLocation';
+import { useLocation } from './hooks/useLocation';
 import { useEmergencyStore } from './store/useEmergencyStore';
 
 const App: React.FC = () => {
-  // Use the new live location hook
-  const { status, location, errorMsg, startTracking, denyLocation } = useLiveLocation();
+  // Use the new, robust location hook
+  const { status, location, errorMsg, startTracking } = useLocation();
   const setEmergencyLocation = useEmergencyStore(state => state.setLocation);
 
-  // Sync the local hook location with the global emergency store so WhatsApp still works
+  // Sync the local hook location with the global emergency store
   useEffect(() => {
     if (location.latitude && location.longitude) {
       setEmergencyLocation({
@@ -25,7 +25,7 @@ const App: React.FC = () => {
     }
   }, [location.latitude, location.longitude, setEmergencyLocation]);
 
-  // Warm up the backend API on load (to wake up Render from sleep)
+  // Warm up the backend API on load
   useEffect(() => {
     fetch('https://lifesensorx.onrender.com').catch(() => {});
   }, []);
@@ -33,11 +33,11 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30">
       
-      {/* Location Permission Modal */}
+      {/* Location Permission Modal - Now blocks app until active */}
       <LocationPermissionModal 
         status={status} 
+        errorMsg={errorMsg}
         onAllow={startTracking} 
-        onDeny={denyLocation} 
       />
 
       {/* Premium Gradient Background */}
