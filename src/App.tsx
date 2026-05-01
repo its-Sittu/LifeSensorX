@@ -5,7 +5,7 @@ import HospitalList from './components/HospitalList';
 import EmergencyModal from './components/EmergencyModal';
 import LocationMap from './components/LocationMap';
 import LocationPermissionModal from './components/LocationPermissionModal';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, MapPin } from 'lucide-react';
 import { useLiveLocation } from './hooks/useLiveLocation';
 import { useEmergencyStore } from './store/useEmergencyStore';
 
@@ -59,14 +59,23 @@ const App: React.FC = () => {
               <span className="text-cyan-400">Life</span>SensorX <span className="text-[10px] text-zinc-600 font-mono align-top ml-1">v1.2</span>
             </h1>
           </div>
-          <div className="w-8 h-8 rounded-full border border-zinc-800 flex items-center justify-center">
-            <div className={`w-2 h-2 rounded-full ${
-              status === 'active' 
-                ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse' 
-                : status === 'loading'
-                ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-bounce'
-                : 'bg-red-500'
-            }`} />
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={startTracking}
+              className="p-1.5 rounded-lg bg-zinc-800/50 border border-zinc-700/50 text-zinc-400 hover:text-white transition-colors"
+              title="Refresh Location"
+            >
+              <MapPin size={14} />
+            </button>
+            <div className="w-8 h-8 rounded-full border border-zinc-800 flex items-center justify-center">
+              <div className={`w-2 h-2 rounded-full ${
+                status === 'active' 
+                  ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse' 
+                  : status === 'loading'
+                  ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-bounce'
+                  : 'bg-red-500'
+              }`} />
+            </div>
           </div>
         </header>
 
