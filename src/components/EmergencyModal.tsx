@@ -4,6 +4,7 @@ import { generateWhatsAppLink } from '../utils/whatsapp';
 import { sendEmergencySMS } from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
+import axios from 'axios';
 import CountdownTimer from './CountdownTimer';
 import AlertPopup from './AlertPopup';
 import HospitalList from './HospitalList';
@@ -92,6 +93,20 @@ const EmergencyModal: React.FC = () => {
       showPopup("Auto-dispatching background SMS alerts...", 'info');
       
       await sendEmergencySMS(contacts, location);
+
+      // Add to Hospital Queue Automatically
+      try {
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+        await axios.post(`${BACKEND_URL}/api/queue`, {
+          name: "EMERGENCY APP USER",
+          age: 0,
+          gender: "Unknown",
+          severity: "CRITICAL",
+          consultationType: "TRAUMA"
+        });
+      } catch (queueErr) {
+        console.error("Could not add to hospital queue", queueErr);
+      }
       
       showPopup("Emergency background alerts sent successfully!");
       setIsSending(false);
