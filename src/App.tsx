@@ -1,13 +1,22 @@
 import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import ContactsManager from './components/ContactsManager';
 import HospitalList from './components/HospitalList';
 import EmergencyModal from './components/EmergencyModal';
 import LocationMap from './components/LocationMap';
 import LocationPermissionModal from './components/LocationPermissionModal';
-import { ShieldAlert, MapPin } from 'lucide-react';
+import { ShieldAlert, MapPin, Building2 } from 'lucide-react';
 import { useLocation } from './hooks/useLocation';
 import { useEmergencyStore } from './store/useEmergencyStore';
+
+// Admin Components
+import AdminLayout from './components/hospital/AdminLayout';
+import HospitalDashboard from './components/hospital/HospitalDashboard';
+import LiveQueueTable from './components/hospital/LiveQueueTable';
+import BedManagement from './components/hospital/BedManagement';
+import Analytics from './components/hospital/Analytics';
+import Settings from './components/hospital/Settings';
 
 const App: React.FC = () => {
   // Use the new, robust location hook
@@ -29,6 +38,37 @@ const App: React.FC = () => {
   useEffect(() => {
     fetch('https://lifesensorx.onrender.com').catch(() => {});
   }, []);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<EmergencyView />} />
+        <Route path="/hospital" element={<AdminLayout />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<HospitalDashboard />} />
+          <Route path="queue" element={<LiveQueueTable />} />
+          <Route path="beds" element={<BedManagement />} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+};
+
+const EmergencyView: React.FC = () => {
+  const { status, location, errorMsg, startTracking } = useLocation();
+  const setEmergencyLocation = useEmergencyStore(state => state.setLocation);
+
+  useEffect(() => {
+    if (location.latitude && location.longitude) {
+      setEmergencyLocation({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        error: null
+      });
+    }
+  }, [location.latitude, location.longitude, setEmergencyLocation]);
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30">
@@ -60,6 +100,13 @@ const App: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            <a 
+              href="/hospital" 
+              className="px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-zinc-700/50 text-xs font-medium text-zinc-400 hover:text-white hover:border-cyan-500/50 transition-colors flex items-center gap-2"
+            >
+              <Building2 size={14} />
+              Hospital Login
+            </a>
             <button 
               onClick={startTracking}
               className="p-1.5 rounded-lg bg-zinc-800/50 border border-zinc-700/50 text-zinc-400 hover:text-white transition-colors"
