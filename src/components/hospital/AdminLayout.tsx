@@ -14,10 +14,10 @@ const AdminLayout: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans flex overflow-hidden">
+    <div className="min-h-screen bg-black text-zinc-100 font-sans flex flex-col md:flex-row overflow-hidden">
       
       {/* Sidebar Navigation */}
-      <aside className="w-64 bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col backdrop-blur-md relative z-20">
+      <aside className="w-full md:w-64 bg-zinc-900/50 border-b md:border-b-0 md:border-r border-zinc-800/50 flex flex-col backdrop-blur-md relative z-20">
         <div className="p-6 flex items-center gap-3 border-b border-zinc-800/50">
           <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-[0_0_20px_rgba(6,182,212,0.5)]">
             <ShieldAlert size={22} className="text-white drop-shadow-lg" />
@@ -27,7 +27,7 @@ const AdminLayout: React.FC = () => {
           </h1>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 flex md:flex-col gap-2 overflow-x-auto md:overflow-x-visible">
           {navItems.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
@@ -41,13 +41,13 @@ const AdminLayout: React.FC = () => {
                 }`}
               >
                 {item.icon}
-                <span className="font-medium">{item.name}</span>
+                <span className="font-medium hidden md:inline">{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-zinc-800/50 text-xs text-zinc-500 text-center">
+        <div className="hidden md:block p-4 border-t border-zinc-800/50 text-xs text-zinc-500 text-center">
           Smart Hospital Manager v1.0
         </div>
       </aside>

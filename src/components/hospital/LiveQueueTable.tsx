@@ -37,11 +37,10 @@ const LiveQueueTable: React.FC = () => {
     fetchQueue();
 
     if (socket) {
-      socket.on('queueUpdate', () => {
-        fetchQueue();
-      });
+      const handleUpdate = () => fetchQueue();
+      socket.on('queueUpdate', handleUpdate);
       return () => {
-        socket.off('queueUpdate');
+        socket.off('queueUpdate', handleUpdate);
       };
     }
   }, [socket]);
