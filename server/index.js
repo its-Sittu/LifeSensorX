@@ -2,13 +2,44 @@ const express = require('express');
 const axios = require('axios');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PUT"]
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 
+// In-Memory Data Store (No Database Required)
+let hospitals = [
+  {
+    _id: "hosp_1",
+    name: "Central General Hospital",
+    address: "123 Main St",
+    location: { lat: 28.6139, lng: 77.2090 },
+    beds: { 
+      total: 100, occupied: 50, available: 50, 
+      icu: { total: 20, occupied: 15, available: 5 }, 
+      emergency: { total: 10, occupied: 8, available: 2 } 
+    },
+    doctorsAvailable: 5,
+    emergencySupport: true,
+    createdAt: new Date()
+  }
+];
+let patients = [];
+
+// Utils
+const { calculateWaitTime } = require('./utils/prediction');
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -17,6 +48,14 @@ app.use(express.json());
 app.use((req, res, next) => {
   console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
   next();
+});
+
+// Socket.io Connection
+io.on('connection', (socket) => {
+  console.log(`🔌 Client connected: ${socket.id}`);
+  socket.on('disconnect', () => {
+    console.log(`🔌 Client disconnected: ${socket.id}`);
+  });
 });
 
 /**
@@ -187,13 +226,95 @@ app.get('/nearby-hospitals', async (req, res) => {
   });
 });
 
+/**
+ * HOSPITAL MANAGEMENT API ENDPOINTS (IN-MEMORY)
+ */
+
+// 1. Get all hospitals
+app.get('/api/hospitals', (req, res) => {
+  res.json({ success: true, data: hospitals });
+});
+
+// 2. Create a new hospital (for testing)
+app.post('/api/hospitals', (req, res) => {
+  const newHospital = {
+    _id: "hosp_" + Date.now(),
+    ...req.body,
+    createdAt: new Date()
+  };
+  hospitals.push(newHospital);
+  io.emit('hospitalUpdate', newHospital);
+  res.status(201).json({ success: true, data: newHospital });
+});
+
+// 3. Get Patient Queue
+app.get('/api/queue', (req, res) => {
+  // Sort by arrival time
+  const sortedPatients = [...patients].sort((a, b) => new Date(a.arrivalTime) - new Date(b.arrivalTime));
+  res.json({ success: true, data: sortedPatients });
+});
+
+// 4. Add Patient to Queue
+app.post('/api/queue', (req, res) => {
+  try {
+    const { hospitalId, ...patientData } = req.body;
+    let hospital = hospitals.find(h => h._id === hospitalId) || hospitals[0];
+
+    const currentQueue = patients.filter(p => p.hospitalId === hospital._id && p.status === 'WAITING');
+    
+    // Predict Wait Time
+    const waitTime = calculateWaitTime(currentQueue, patientData, hospital.doctorsAvailable);
+    
+    const newPatient = {
+      _id: "pat_" + Date.now(),
+      hospitalId: hospital._id,
+      ...patientData,
+      status: patientData.status || 'WAITING',
+      severity: patientData.severity || 'MEDIUM',
+      consultationType: patientData.consultationType || 'GENERAL',
+      arrivalTime: new Date(),
+      estimatedWaitTime: waitTime
+    };
+
+    patients.push(newPatient);
+    
+    // Emit real-time update
+    io.emit('queueUpdate', { action: 'add', data: newPatient });
+    
+    res.status(201).json({ success: true, data: newPatient });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 5. Update Patient Status (e.g., ADMITTED)
+app.put('/api/queue/:id/status', (req, res) => {
+  try {
+    const { status } = req.body;
+    const patientIndex = patients.findIndex(p => p._id === req.params.id);
+    
+    if (patientIndex === -1) {
+      return res.status(404).json({ success: false, error: "Patient not found" });
+    }
+
+    patients[patientIndex].status = status;
+    
+    // Emit real-time update
+    io.emit('queueUpdate', { action: 'update', data: patients[patientIndex] });
+    
+    res.json({ success: true, data: patients[patientIndex] });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Health Check
 app.get('/', (req, res) => {
   res.send("LifeSensorX Emergency API (Fast2SMS Edition) is running...");
 });
 
 // Start Server
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Emergency Backend running on port ${PORT}`);
   console.log(`🔗 Fast2SMS integration active.`);
 });
