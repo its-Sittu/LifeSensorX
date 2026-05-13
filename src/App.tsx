@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import ContactsManager from './components/ContactsManager';
 import HospitalList from './components/HospitalList';
@@ -100,13 +100,13 @@ const EmergencyView: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <a 
-              href="/hospital" 
+            <Link 
+              to="/hospital" 
               className="px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-zinc-700/50 text-xs font-medium text-zinc-400 hover:text-white hover:border-cyan-500/50 transition-colors flex items-center gap-2"
             >
               <Building2 size={14} />
               Hospital Login
-            </a>
+            </Link>
             <button 
               onClick={startTracking}
               className="p-1.5 rounded-lg bg-zinc-800/50 border border-zinc-700/50 text-zinc-400 hover:text-white transition-colors"
