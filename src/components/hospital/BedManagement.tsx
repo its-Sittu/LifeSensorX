@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useHospitalSocket } from '../../hooks/useHospitalSocket';
 import axios from 'axios';
-import { BedDouble, AlertCircle, HeartPulse, CheckCircle2 } from 'lucide-react';
+import { BedDouble, AlertCircle, HeartPulse, CheckCircle2, Plus, Minus } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
@@ -35,7 +35,16 @@ const BedManagement: React.FC = () => {
 
   const beds = hospital.beds;
 
-  const BedTypeCard = ({ title, data, icon, colorClass, borderClass }: any) => {
+  const updateBedCount = async (type: string, action: string) => {
+    try {
+      await axios.put(`${BACKEND_URL}/api/hospitals/${hospital._id}/beds`, { type, action });
+      // The socket will trigger a re-fetch automatically
+    } catch (err) {
+      console.error("Failed to update bed count", err);
+    }
+  };
+
+  const BedTypeCard = ({ title, type, data, icon, colorClass, borderClass }: any) => {
     const percentage = data.total > 0 ? Math.round((data.occupied / data.total) * 100) : 0;
     
     return (
@@ -47,7 +56,27 @@ const BedManagement: React.FC = () => {
             </div>
             <h3 className="text-lg font-semibold text-white">{title}</h3>
           </div>
-          <span className="text-2xl font-bold text-white">{data.available} <span className="text-sm font-medium text-zinc-500">/ {data.total}</span></span>
+          <div className="flex flex-col items-end gap-2">
+            <span className="text-2xl font-bold text-white">{data.available} <span className="text-sm font-medium text-zinc-500">/ {data.total}</span></span>
+            <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800">
+              <button 
+                onClick={() => updateBedCount(type, 'free')}
+                disabled={data.occupied === 0}
+                className="w-7 h-7 flex items-center justify-center rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-emerald-400 disabled:opacity-50 transition-colors"
+                title="Free Bed"
+              >
+                <Minus size={14} />
+              </button>
+              <button 
+                onClick={() => updateBedCount(type, 'allocate')}
+                disabled={data.available === 0}
+                className="w-7 h-7 flex items-center justify-center rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-red-400 disabled:opacity-50 transition-colors"
+                title="Allocate Bed"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
         </div>
         
         <div className="space-y-2">
@@ -76,6 +105,7 @@ const BedManagement: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <BedTypeCard 
           title="Total Beds" 
+          type="general"
           data={beds} 
           icon={<BedDouble size={20} />} 
           colorClass="text-blue-400" 
@@ -83,6 +113,7 @@ const BedManagement: React.FC = () => {
         />
         <BedTypeCard 
           title="ICU Beds" 
+          type="icu"
           data={beds.icu} 
           icon={<HeartPulse size={20} />} 
           colorClass="text-amber-400" 
@@ -90,6 +121,7 @@ const BedManagement: React.FC = () => {
         />
         <BedTypeCard 
           title="Emergency Beds" 
+          type="emergency"
           data={beds.emergency} 
           icon={<AlertCircle size={20} />} 
           colorClass="text-red-400" 

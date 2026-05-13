@@ -230,9 +230,44 @@ app.get('/nearby-hospitals', async (req, res) => {
  * HOSPITAL MANAGEMENT API ENDPOINTS (IN-MEMORY)
  */
 
-// 1. Get all hospitals
+// 1. Get Hospital Stats
 app.get('/api/hospitals', (req, res) => {
   res.json({ success: true, data: hospitals });
+});
+
+// 1b. Update Bed Counts
+app.put('/api/hospitals/:id/beds', (req, res) => {
+  try {
+    const { type, action } = req.body; // type: 'icu', 'emergency', 'general'. action: 'allocate', 'free'
+    const hospital = hospitals.find(h => h._id === req.params.id) || hospitals[0];
+    
+    let target = null;
+    if (type === 'icu') target = hospital.beds.icu;
+    else if (type === 'emergency') target = hospital.beds.emergency;
+    else target = hospital.beds; // 'general' maps to total
+
+    if (!target) return res.status(400).json({ error: 'Invalid bed type' });
+
+    if (action === 'allocate' && target.available > 0) {
+      target.occupied++;
+      target.available--;
+    } else if (action === 'free' && target.occupied > 0) {
+      target.occupied--;
+      target.available++;
+    }
+
+    // Recalculate total if we updated a subtype
+    if (type !== 'general') {
+      hospital.beds.occupied = hospital.beds.icu.occupied + hospital.beds.emergency.occupied;
+      // Assume total beds is static, available = total - occupied
+      hospital.beds.available = hospital.beds.total - hospital.beds.occupied;
+    }
+
+    io.emit('hospitalUpdate', { hospitalId: hospital._id, beds: hospital.beds });
+    res.json({ success: true, data: hospital.beds });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // 2. Create a new hospital (for testing)

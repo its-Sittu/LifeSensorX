@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, UserPlus, AlertCircle } from 'lucide-react';
+import { X, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
 import axios from 'axios';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
@@ -18,6 +18,7 @@ const AddPatientModal: React.FC<AddPatientModalProps> = ({ isOpen, onClose }) =>
     consultationType: 'GENERAL'
   });
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   if (!isOpen) return null;
 
@@ -29,7 +30,18 @@ const AddPatientModal: React.FC<AddPatientModalProps> = ({ isOpen, onClose }) =>
         ...formData,
         age: parseInt(formData.age) || 0
       });
-      onClose();
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        onClose();
+        setFormData({
+          name: '',
+          age: '',
+          gender: 'Male',
+          severity: 'MEDIUM',
+          consultationType: 'GENERAL'
+        });
+      }, 1500);
     } catch (err) {
       console.error("Failed to add patient", err);
     } finally {
@@ -41,8 +53,18 @@ const AddPatientModal: React.FC<AddPatientModalProps> = ({ isOpen, onClose }) =>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative">
         
-        {/* Header */}
-        <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-gradient-to-r from-zinc-900 to-zinc-900/50">
+        {success ? (
+          <div className="p-12 flex flex-col items-center justify-center text-center animate-in zoom-in duration-300">
+            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
+              <CheckCircle2 size={40} className="text-emerald-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Successfully Added!</h2>
+            <p className="text-zinc-400">Patient has been pushed to the live queue.</p>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-gradient-to-r from-zinc-900 to-zinc-900/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20 text-cyan-400">
               <UserPlus size={20} />
@@ -139,6 +161,7 @@ const AddPatientModal: React.FC<AddPatientModalProps> = ({ isOpen, onClose }) =>
             </button>
           </div>
         </form>
+        </>}
       </div>
     </div>
   );
