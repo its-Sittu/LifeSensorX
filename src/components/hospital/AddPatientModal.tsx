@@ -161,7 +161,8 @@ const AddPatientModal: React.FC<AddPatientModalProps> = ({ isOpen, onClose }) =>
             </button>
           </div>
         </form>
-        </>}
+        </>
+        )}
       </div>
     </div>
   );
