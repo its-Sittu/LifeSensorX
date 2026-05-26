@@ -10,4 +10,25 @@ export default defineConfig({
     react(),
     mkcert()
   ],
+  server: {
+    proxy: {
+      '/send-alert': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/nearby-hospitals': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        ws: true,
+        changeOrigin: true,
+      }
+    }
+  }
 })

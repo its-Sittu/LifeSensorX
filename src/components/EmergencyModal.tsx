@@ -96,7 +96,7 @@ const EmergencyModal: React.FC = () => {
 
       // Add to Hospital Queue Automatically
       try {
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://lifesensorx.onrender.com');
         await axios.post(`${BACKEND_URL}/api/queue`, {
           name: "EMERGENCY APP USER",
           age: 0,

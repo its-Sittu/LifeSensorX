@@ -3,7 +3,7 @@ import { useHospitalSocket } from '../../hooks/useHospitalSocket';
 import axios from 'axios';
 import { BedDouble, AlertCircle, HeartPulse, CheckCircle2, Plus, Minus } from 'lucide-react';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://lifesensorx.onrender.com');
 
 const BedManagement: React.FC = () => {
   const { socket } = useHospitalSocket();

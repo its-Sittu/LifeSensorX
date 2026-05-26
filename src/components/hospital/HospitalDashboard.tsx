@@ -5,7 +5,7 @@ import { useHospitalSocket } from '../../hooks/useHospitalSocket';
 import axios from 'axios';
 import AddPatientModal from './AddPatientModal';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://lifesensorx.onrender.com');
 
 const HospitalDashboard: React.FC = () => {
   const { socket, connected } = useHospitalSocket();

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
 import axios from 'axios';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://lifesensorx.onrender.com');
 
 interface AddPatientModalProps {
   isOpen: boolean;
