@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useEmergencyStore } from '../store/useEmergencyStore';
 import { generateWhatsAppLink } from '../utils/whatsapp';
-import { sendEmergencySMS } from '../utils/api';
+import { sendEmergencySMS, fetchNearbyHospitals } from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
 import axios from 'axios';
@@ -16,7 +16,7 @@ const EmergencyModal: React.FC = () => {
   const [popupMsg, setPopupMsg] = useState<{ text: string, type: 'success' | 'info' } | null>(null);
   const [showSelection, setShowSelection] = useState(false);
   
-  const { isEmergencyMode, cancelEmergency, contacts, location } = useEmergencyStore();
+  const { isEmergencyMode, showEmergencyModal, cancelEmergency, closeEmergencyModal, contacts, location, setHospitals, setLocation } = useEmergencyStore();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const stopAlerts = useCallback(() => {
@@ -110,7 +110,61 @@ const EmergencyModal: React.FC = () => {
       
       showPopup("Emergency background alerts sent successfully!");
       setIsSending(false);
-      cancelEmergency(); // Close modal on total success
+
+      // Automatically fetch the user’s current high-accuracy latitude and longitude
+      if (navigator.geolocation) {
+        showPopup("Acquiring high-accuracy GPS coordinates...", 'info');
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            console.log(`[GPS] Fresh coordinates fetched after alarm: ${lat}, ${lng}`);
+            
+            // Sync location to emergency store
+            setLocation({ latitude: lat, longitude: lng, error: null });
+            
+            try {
+              showPopup("Searching for nearby hospitals within 10 KM...", 'info');
+              const data = await fetchNearbyHospitals(lat, lng);
+              setHospitals(data);
+              showPopup("Nearby hospitals loaded successfully!");
+            } catch (hospitalErr: any) {
+              console.error("Failed to load hospitals post-countdown:", hospitalErr);
+              showPopup("Failed to search nearby hospitals.", 'info');
+            }
+          },
+          async (gpsErr) => {
+            console.warn("[GPS] Fresh location failed, using cached:", gpsErr);
+            // Fallback to existing coordinates
+            if (location.latitude && location.longitude) {
+              try {
+                showPopup("Searching for nearby hospitals (cached GPS)...", 'info');
+                const data = await fetchNearbyHospitals(location.latitude, location.longitude);
+                setHospitals(data);
+                showPopup("Nearby hospitals loaded successfully!");
+              } catch (hospitalErr) {
+                console.error("Failed to fetch hospitals using fallback:", hospitalErr);
+              }
+            } else {
+              showPopup("Could not determine location for hospital search.", 'info');
+            }
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      } else {
+        // Simple fallback
+        if (location.latitude && location.longitude) {
+          try {
+            const data = await fetchNearbyHospitals(location.latitude, location.longitude);
+            setHospitals(data);
+            showPopup("Nearby hospitals loaded!");
+          } catch (hospitalErr) {
+            console.error("Fallback hospital query failed:", hospitalErr);
+          }
+        }
+      }
+
+      closeEmergencyModal(); // Close the modal (but keep isEmergencyMode active so hospitals display on dashboard)
     } catch (error: any) {
       console.error('Backend dispatch failed:', error);
       setIsSending(false);
@@ -175,7 +229,7 @@ const EmergencyModal: React.FC = () => {
   return (
     <>
       <AnimatePresence>
-        {isEmergencyMode && (
+        {showEmergencyModal && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

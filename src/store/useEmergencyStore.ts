@@ -25,27 +25,33 @@ export interface LocationData {
 
 interface EmergencyState {
   isEmergencyMode: boolean;
+  showEmergencyModal: boolean;
   contacts: Contact[];
   location: LocationData;
+  hospitals: Hospital[];
   triggerEmergency: () => void;
   cancelEmergency: () => void;
+  closeEmergencyModal: () => void;
   addContact: (contact: Omit<Contact, 'id'>) => void;
   removeContact: (id: string) => void;
   setLocation: (loc: Partial<LocationData>) => void;
+  setHospitals: (hospitals: Hospital[]) => void;
 }
 
 export const useEmergencyStore = create<EmergencyState>()(
   persist(
     (set) => ({
       isEmergencyMode: false,
+      showEmergencyModal: false,
       contacts: [
         { id: '1', name: 'Emergency Monitor', phone: '+19897877228' }
       ],
       location: { latitude: null, longitude: null, error: null },
       hospitals: [],
 
-      triggerEmergency: () => set({ isEmergencyMode: true }),
-      cancelEmergency: () => set({ isEmergencyMode: false }),
+      triggerEmergency: () => set({ isEmergencyMode: true, showEmergencyModal: true }),
+      cancelEmergency: () => set({ isEmergencyMode: false, showEmergencyModal: false, hospitals: [] }),
+      closeEmergencyModal: () => set({ showEmergencyModal: false }),
 
       addContact: (contact) =>
         set((state) => ({
