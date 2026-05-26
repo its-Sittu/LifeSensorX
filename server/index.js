@@ -147,18 +147,59 @@ app.get('/nearby-hospitals', async (req, res) => {
 
   const API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
-  // 1. Try Google Places API (Two-step fetch for phone numbers)
+  // 1. Try Google Places API (Try New API first, fallback to Legacy/Classic API)
   if (API_KEY && API_KEY !== 'your_google_maps_key_here') {
+    // 1a. Try Google Places API (New) - Faster, cheaper, and phone numbers are loaded directly!
     try {
-      console.log(`[DEBUG] Step 1: Google Nearby Search...`);
+      console.log(`[DEBUG] Step 1a: Google Nearby Search (New)...`);
+      const googleNewRes = await axios.post(
+        'https://places.googleapis.com/v1/places:searchNearby',
+        {
+          includedTypes: ['hospital'],
+          maxResultCount: 5,
+          locationRestriction: {
+            circle: {
+              center: {
+                latitude: parseFloat(lat),
+                longitude: parseFloat(lng)
+              },
+              radius: 10000.0
+            }
+          }
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': API_KEY,
+            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber'
+          }
+        }
+      );
+
+      if (googleNewRes.data && googleNewRes.data.places) {
+        const hospitals = googleNewRes.data.places.map(place => ({
+          name: place.displayName?.text || 'Hospital',
+          address: place.formattedAddress || 'Nearby Services',
+          location: {
+            lat: place.location?.latitude,
+            lng: place.location?.longitude
+          },
+          phone: place.internationalPhoneNumber || null
+        }));
+        console.log(`[DEBUG] Google Places API (New) fetched successfully.`);
+        return res.status(200).json({ success: true, source: 'google_new', results: hospitals });
+      }
+    } catch (err) {
+      console.log(`[DEBUG] Google Places API (New) failed or is disabled:`, err.message);
+    }
+
+    // 1b. Try Google Places API (Legacy/Classic) as secondary option
+    try {
+      console.log(`[DEBUG] Step 1b: Google Nearby Search (Legacy)...`);
       const googleUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=10000&type=hospital&key=${API_KEY}`;
       const response = await axios.get(googleUrl);
 
       console.log(`[DEBUG] Google API Status: ${response.data.status}`);
-      if (response.data.error_message) {
-        console.log(`[DEBUG] Google API Error: ${response.data.error_message}`);
-      }
-
       if (response.data.status === 'OK') {
         const top5 = response.data.results.slice(0, 5);
         
@@ -187,7 +228,7 @@ app.get('/nearby-hospitals', async (req, res) => {
         return res.status(200).json({ success: true, source: 'google', results: detailedHospitals });
       }
     } catch (err) {
-      console.error(`[ERROR] Google API Flow Failed:`, err.message);
+      console.error(`[ERROR] Google API Legacy Flow Failed:`, err.message);
     }
   }
 
