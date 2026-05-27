@@ -138,59 +138,102 @@ app.post('/send-alert', async (req, res) => {
  * Purpose: Proxies request to Google Places API to find hospitals
  */
 app.get('/nearby-hospitals', async (req, res) => {
-  const { lat, lng } = req.query;
-  console.log(`[DEBUG] Fetching hospitals with phone numbers for: ${lat}, ${lng}`);
+  const { lat, lng, query } = req.query;
 
-  if (!lat || !lng) {
-    return res.status(400).json({ success: false, error: "Lat/Lng required" });
+  if (query) {
+    console.log(`[DEBUG] Fetching hospitals by query: ${query}`);
+  } else {
+    console.log(`[DEBUG] Fetching hospitals with phone numbers for: ${lat}, ${lng}`);
+    if (!lat || !lng) {
+      return res.status(400).json({ success: false, error: "Lat/Lng or query required" });
+    }
   }
 
   const API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
   // 1. Try Google Places API (Try New API first, fallback to Legacy/Classic API)
   if (API_KEY && API_KEY !== 'your_google_maps_key_here') {
-    // 1a. Try Google Places API (New) - Faster, cheaper, and phone numbers are loaded directly!
-    try {
-      console.log(`[DEBUG] Step 1a: Google Nearby Search (New)...`);
-      const googleNewRes = await axios.post(
-        'https://places.googleapis.com/v1/places:searchNearby',
-        {
-          includedTypes: ['hospital'],
-          maxResultCount: 5,
-          locationRestriction: {
-            circle: {
-              center: {
-                latitude: parseFloat(lat),
-                longitude: parseFloat(lng)
-              },
-              radius: 10000.0
+    // 1a. Try Google Places Text Search (New) if query is provided
+    if (query) {
+      try {
+        console.log(`[DEBUG] Step 1a: Google Text Search (New)...`);
+        const googleTextRes = await axios.post(
+          'https://places.googleapis.com/v1/places:searchText',
+          {
+            textQuery: `hospitals in ${query}`,
+            maxResultCount: 5
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': API_KEY,
+              'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber'
             }
           }
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': API_KEY,
-            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber'
-          }
-        }
-      );
+        );
 
-      if (googleNewRes.data && googleNewRes.data.places) {
-        const hospitals = googleNewRes.data.places.map(place => ({
-          name: place.displayName?.text || 'Hospital',
-          address: place.formattedAddress || 'Nearby Services',
-          location: {
-            lat: place.location?.latitude,
-            lng: place.location?.longitude
-          },
-          phone: place.internationalPhoneNumber || null
-        }));
-        console.log(`[DEBUG] Google Places API (New) fetched successfully.`);
-        return res.status(200).json({ success: true, source: 'google_new', results: hospitals });
+        if (googleTextRes.data && googleTextRes.data.places) {
+          const hospitals = googleTextRes.data.places.map(place => ({
+            name: place.displayName?.text || 'Hospital',
+            address: place.formattedAddress || 'Nearby Services',
+            location: {
+              lat: place.location?.latitude,
+              lng: place.location?.longitude
+            },
+            phone: place.internationalPhoneNumber || null
+          }));
+          console.log(`[DEBUG] Google Places Text Search (New) fetched successfully.`);
+          return res.status(200).json({ success: true, source: 'google_new_text', results: hospitals });
+        }
+      } catch (err) {
+        console.log(`[DEBUG] Google Places Text Search (New) failed or is disabled:`, err.message);
       }
-    } catch (err) {
-      console.log(`[DEBUG] Google Places API (New) failed or is disabled:`, err.message);
+    }
+
+    // 1b. Try Google Places API (New) - Nearby Search
+    if (lat && lng) {
+      try {
+        console.log(`[DEBUG] Step 1b: Google Nearby Search (New)...`);
+        const googleNewRes = await axios.post(
+          'https://places.googleapis.com/v1/places:searchNearby',
+          {
+            includedTypes: ['hospital'],
+            maxResultCount: 5,
+            locationRestriction: {
+              circle: {
+                center: {
+                  latitude: parseFloat(lat),
+                  longitude: parseFloat(lng)
+                },
+                radius: 10000.0
+              }
+            }
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': API_KEY,
+              'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber'
+            }
+          }
+        );
+
+        if (googleNewRes.data && googleNewRes.data.places) {
+          const hospitals = googleNewRes.data.places.map(place => ({
+            name: place.displayName?.text || 'Hospital',
+            address: place.formattedAddress || 'Nearby Services',
+            location: {
+              lat: place.location?.latitude,
+              lng: place.location?.longitude
+            },
+            phone: place.internationalPhoneNumber || null
+          }));
+          console.log(`[DEBUG] Google Places API (New) fetched successfully.`);
+          return res.status(200).json({ success: true, source: 'google_new', results: hospitals });
+        }
+      } catch (err) {
+        console.log(`[DEBUG] Google Places API (New) failed or is disabled:`, err.message);
+      }
     }
 
     // 1b. Try Google Places API (Legacy/Classic) as secondary option

@@ -31,9 +31,13 @@ export const sendEmergencySMS = async (contacts: Contact[], location: LocationDa
   }
 };
 
-export const fetchNearbyHospitals = async (lat: number, lng: number) => {
+export const fetchNearbyHospitals = async (lat: number | null, lng: number | null, query: string | null = null) => {
   try {
-    const response = await fetch(`${BACKEND_URL}/nearby-hospitals?lat=${lat}&lng=${lng}`);
+    const url = query 
+      ? `${BACKEND_URL}/nearby-hospitals?query=${encodeURIComponent(query)}`
+      : `${BACKEND_URL}/nearby-hospitals?lat=${lat}&lng=${lng}`;
+
+    const response = await fetch(url);
     const data = await response.json();
     
     if (!response.ok) {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useEmergencyStore } from '../store/useEmergencyStore';
 import { fetchNearbyHospitals } from '../utils/api';
-import { HeartPulse, Navigation, Loader2, Phone, MapPin } from 'lucide-react';
+import { HeartPulse, Navigation, Loader2, Phone, MapPin, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -21,25 +21,32 @@ const HospitalList: React.FC = () => {
   const { isEmergencyMode, location, hospitals, setHospitals } = useEmergencyStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const getHospitals = async (lat: number | null, lng: number | null, query: string | null = null) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await fetchNearbyHospitals(lat, lng, query);
+      setHospitals(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load hospitals");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const getHospitals = async () => {
-      if (isEmergencyMode && location.latitude && location.longitude) {
-        try {
-          setIsLoading(true);
-          setError(null);
-          const data = await fetchNearbyHospitals(location.latitude, location.longitude);
-          setHospitals(data);
-        } catch (err: any) {
-          setError(err.message || "Failed to load hospitals");
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    getHospitals();
+    if (isEmergencyMode && location.latitude && location.longitude) {
+      getHospitals(location.latitude, location.longitude);
+    }
   }, [isEmergencyMode, location.latitude, location.longitude, setHospitals]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    getHospitals(null, null, searchQuery.trim());
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -50,6 +57,27 @@ const HospitalList: React.FC = () => {
         </h3>
         {isLoading && <Loader2 size={18} className="text-blue-400 animate-spin" />}
       </div>
+
+      {/* Manual Geolocation Search Bar */}
+      <form onSubmit={handleSearchSubmit} className="flex gap-2">
+        <div className="relative flex-1">
+          <input 
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Type city or neighborhood (e.g. Saket, Delhi)"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all placeholder:text-zinc-600"
+          />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+        </div>
+        <button 
+          type="submit"
+          disabled={isLoading}
+          className="px-4 py-2.5 bg-zinc-800 text-xs font-semibold text-zinc-300 rounded-xl border border-zinc-700 hover:text-white hover:border-cyan-500/50 transition-all active:scale-95 shrink-0 disabled:opacity-50"
+        >
+          Search
+        </button>
+      </form>
 
       <div className="flex flex-col gap-3 min-h-[100px]">
         <AnimatePresence mode="popLayout">
