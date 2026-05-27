@@ -1,5 +1,5 @@
-import React from 'react';
-import { MapPin, ShieldAlert, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { MapPin, ShieldAlert, Loader2, RefreshCw, AlertCircle, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LocationStatus } from '../hooks/useLocation';
 
@@ -10,8 +10,9 @@ interface Props {
 }
 
 const LocationPermissionModal: React.FC<Props> = ({ status, errorMsg, onAllow }) => {
+  const [isDismissed, setIsDismissed] = useState(false);
   // Show modal if not active and not in a completely terminal error state (though we show errors inside)
-  const isVisible = status !== 'active';
+  const isVisible = status !== 'active' && !isDismissed;
 
   return (
     <AnimatePresence>
@@ -29,17 +30,17 @@ const LocationPermissionModal: React.FC<Props> = ({ status, errorMsg, onAllow })
           >
             {/* Background glow */}
             <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 blur-[50px] rounded-full pointer-events-none transition-colors duration-500 ${
-              status === 'denied' || status === 'unavailable' ? 'bg-red-500/20' : 'bg-blue-500/20'
+              status === 'denied' || status === 'unavailable' || status === 'error' ? 'bg-red-500/20' : 'bg-blue-500/20'
             }`} />
 
             <div className={`w-16 h-16 rounded-full border flex items-center justify-center mb-6 transition-colors duration-300 ${
-              status === 'denied' || status === 'unavailable' 
+              status === 'denied' || status === 'unavailable' || status === 'error'
                 ? 'bg-red-500/10 border-red-500/30 text-red-400' 
                 : 'bg-zinc-800/80 border-zinc-700 text-blue-400'
             }`}>
               {status === 'loading' ? (
                 <Loader2 size={32} className="animate-spin" />
-              ) : status === 'denied' || status === 'unavailable' ? (
+              ) : status === 'denied' || status === 'unavailable' || status === 'error' ? (
                 <AlertCircle size={32} />
               ) : (
                 <MapPin size={32} />
@@ -49,6 +50,7 @@ const LocationPermissionModal: React.FC<Props> = ({ status, errorMsg, onAllow })
             <h2 className="text-2xl font-bold text-white mb-3 tracking-tight">
               {status === 'denied' ? 'Permission Denied' : 
                status === 'unavailable' ? 'GPS is Off' : 
+               status === 'error' ? 'Geolocation Failed' :
                status === 'loading' ? 'Fetching Location...' : 
                'Enable Location Access'}
             </h2>
@@ -62,7 +64,7 @@ const LocationPermissionModal: React.FC<Props> = ({ status, errorMsg, onAllow })
                 onClick={onAllow}
                 disabled={status === 'loading'}
                 className={`w-full py-3.5 rounded-xl text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 ${
-                  status === 'denied' || status === 'unavailable'
+                  status === 'denied' || status === 'unavailable' || status === 'error'
                     ? 'bg-red-600 hover:bg-red-500 shadow-[0_0_15px_rgba(220,38,38,0.4)]'
                     : 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.4)]'
                 }`}
@@ -72,7 +74,7 @@ const LocationPermissionModal: React.FC<Props> = ({ status, errorMsg, onAllow })
                     <Loader2 size={18} className="animate-spin" />
                     Connecting to GPS...
                   </>
-                ) : status === 'denied' || status === 'unavailable' ? (
+                ) : status === 'denied' || status === 'unavailable' || status === 'error' ? (
                   <>
                     <RefreshCw size={18} />
                     Try Again
@@ -81,6 +83,17 @@ const LocationPermissionModal: React.FC<Props> = ({ status, errorMsg, onAllow })
                   'Allow Location Access'
                 )}
               </button>
+
+              {/* Bypass button for manual search */}
+              {(status === 'denied' || status === 'unavailable' || status === 'error' || status === 'idle') && (
+                <button 
+                  onClick={() => setIsDismissed(true)}
+                  className="w-full py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 hover:border-zinc-700 mt-1"
+                >
+                  <Search size={14} />
+                  Search Hospitals Manually
+                </button>
+              )}
             </div>
             
             <div className="mt-6 flex items-center gap-2 text-xs text-zinc-500">
