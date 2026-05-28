@@ -37,10 +37,10 @@ const EmergencyModal: React.FC = () => {
       // Play loud alarm
       try {
         if (!audioRef.current) {
-          audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3');
+          audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
           audioRef.current.loop = true;
         } else {
-          audioRef.current.src = 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3';
+          audioRef.current.src = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
         }
         
         const playPromise = audioRef.current.play();
