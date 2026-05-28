@@ -17,17 +17,12 @@ const EmergencyModal: React.FC = () => {
   const [showSelection, setShowSelection] = useState(false);
   
   const { isEmergencyMode, showEmergencyModal, cancelEmergency, closeEmergencyModal, contacts, location, setHospitals, setLocation } = useEmergencyStore();
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const alarmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const stopAlerts = useCallback(() => {
-    if (alarmIntervalRef.current) {
-      clearInterval(alarmIntervalRef.current);
-      alarmIntervalRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
     if ('vibrate' in navigator) {
       navigator.vibrate(0);
@@ -39,49 +34,24 @@ const EmergencyModal: React.FC = () => {
       setTimeLeft(COUNTDOWN_TIME);
       setShowSelection(false);
       
-      // Play fire emergency alarm using Web Audio API
+      // Play loud alarm
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        audioContextRef.current = ctx;
-
-        // Fire alarm: pulsing dual-tone (800Hz + 1200Hz) at ~3 pulses/sec
-        const playPulse = () => {
-          const now = ctx.currentTime;
-          const duration = 0.15; // short sharp pulse
-
-          // Primary tone — 800 Hz
-          const osc1 = ctx.createOscillator();
-          osc1.type = 'square';
-          osc1.frequency.setValueAtTime(800, now);
-          
-          // Secondary tone — 1200 Hz (creates that harsh fire alarm feel)
-          const osc2 = ctx.createOscillator();
-          osc2.type = 'square';
-          osc2.frequency.setValueAtTime(1200, now);
-
-          // Gain envelope — sharp attack, quick release
-          const gain = ctx.createGain();
-          gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(0.6, now + 0.01);
-          gain.gain.setValueAtTime(0.6, now + duration - 0.02);
-          gain.gain.linearRampToValueAtTime(0, now + duration);
-
-          osc1.connect(gain);
-          osc2.connect(gain);
-          gain.connect(ctx.destination);
-
-          osc1.start(now);
-          osc2.start(now);
-          osc1.stop(now + duration);
-          osc2.stop(now + duration);
-        };
-
-        // Pulse immediately, then repeat every ~330ms (≈3 Hz pulsing)
-        playPulse();
-        alarmIntervalRef.current = setInterval(playPulse, 330);
-
+        if (!audioRef.current) {
+          audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3');
+          audioRef.current.loop = true;
+        } else {
+          audioRef.current.src = 'https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3';
+        }
+        
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log('Audio autoplay prevented.', error);
+          });
+        }
+        
         if ('vibrate' in navigator) {
-          navigator.vibrate([200, 130, 200, 130, 200, 130, 200, 130, 200, 130]);
+          navigator.vibrate([500, 500, 500, 500, 500, 500]);
         }
       } catch (err) {
         console.error('Audio/Vibration error:', err);
