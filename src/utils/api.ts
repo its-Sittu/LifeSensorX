@@ -16,16 +16,28 @@ export const sendEmergencySMS = async (contacts: Contact[], location: LocationDa
         latitude: location.latitude,
         longitude: location.longitude,
       }),
+    }).catch(() => {
+      throw new Error('Connection failed. Please ensure the backend server is running on port 5000.');
     });
 
-    const data = await response.json();
-    
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to send alerts');
+      const text = await response.text().catch(() => '');
+      let errorMessage = 'Failed to send alerts';
+      try {
+        const parsed = JSON.parse(text);
+        errorMessage = parsed.error || errorMessage;
+      } catch {
+        errorMessage = `Server responded with status ${response.status}. Please make sure the backend server is running on port 5000.`;
+      }
+      throw new Error(errorMessage);
     }
 
+    const data = await response.json().catch(() => {
+      throw new Error('Invalid response received from server. Check if the backend is running properly.');
+    });
+    
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('SMS API Error:', error);
     throw error;
   }
@@ -37,16 +49,30 @@ export const fetchNearbyHospitals = async (lat: number | null, lng: number | nul
       ? `${BACKEND_URL}/nearby-hospitals?query=${encodeURIComponent(query)}`
       : `${BACKEND_URL}/nearby-hospitals?lat=${lat}&lng=${lng}`;
 
-    const response = await fetch(url);
-    const data = await response.json();
-    
+    const response = await fetch(url).catch(() => {
+      throw new Error('Connection failed. Please ensure the backend server is running on port 5000.');
+    });
+
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to fetch hospitals');
+      const text = await response.text().catch(() => '');
+      let errorMessage = 'Failed to fetch hospitals';
+      try {
+        const parsed = JSON.parse(text);
+        errorMessage = parsed.error || errorMessage;
+      } catch {
+        errorMessage = `Server responded with status ${response.status}. Please make sure the backend server is running on port 5000.`;
+      }
+      throw new Error(errorMessage);
     }
 
+    const data = await response.json().catch(() => {
+      throw new Error('Invalid response received from server. Check if the backend is running properly.');
+    });
+
     return data.results;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Hospitals API Error:', error);
     throw error;
   }
 };
+

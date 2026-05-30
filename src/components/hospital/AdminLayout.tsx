@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Activity, Users, BedDouble, Settings, ShieldAlert, LayoutDashboard } from 'lucide-react';
+import { Activity, Users, BedDouble, Settings, ShieldAlert, LayoutDashboard, Home } from 'lucide-react';
 
 const AdminLayout: React.FC = () => {
   const location = useLocation();
@@ -11,6 +11,7 @@ const AdminLayout: React.FC = () => {
     { name: 'Bed Management', path: '/hospital/beds', icon: <BedDouble size={20} /> },
     { name: 'Analytics', path: '/hospital/analytics', icon: <Activity size={20} /> },
     { name: 'Settings', path: '/hospital/settings', icon: <Settings size={20} /> },
+    { name: 'Home Page', path: '/', icon: <Home size={20} /> },
   ];
 
   return (
@@ -18,18 +19,20 @@ const AdminLayout: React.FC = () => {
       
       {/* Sidebar Navigation */}
       <aside className="w-full md:w-64 bg-zinc-900/50 border-b md:border-b-0 md:border-r border-zinc-800/50 flex flex-col backdrop-blur-md relative z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-zinc-800/50">
+        <Link to="/hospital/dashboard" className="p-6 flex items-center gap-3 border-b border-zinc-800/50 hover:opacity-85 transition-opacity">
           <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-[0_0_20px_rgba(6,182,212,0.5)]">
             <ShieldAlert size={22} className="text-white drop-shadow-lg" />
           </div>
           <h1 className="text-xl font-bold tracking-tight">
             <span className="text-cyan-400">Life</span>Sensor<span className="text-zinc-500 text-sm"> Admin</span>
           </h1>
-        </div>
+        </Link>
 
         <nav className="flex-1 p-4 flex md:flex-col gap-2 overflow-x-auto md:overflow-x-visible">
           {navItems.map((item) => {
-            const isActive = location.pathname.startsWith(item.path);
+            const isActive = item.path === '/' 
+              ? location.pathname === '/' 
+              : location.pathname.startsWith(item.path);
             return (
               <Link
                 key={item.name}

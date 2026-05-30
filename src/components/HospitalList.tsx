@@ -37,10 +37,10 @@ const HospitalList: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isEmergencyMode && location.latitude && location.longitude) {
+    if (location.latitude && location.longitude) {
       getHospitals(location.latitude, location.longitude);
     }
-  }, [isEmergencyMode, location.latitude, location.longitude, setHospitals]);
+  }, [location.latitude, location.longitude, setHospitals]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +95,7 @@ const HospitalList: React.FC = () => {
             <div className="p-8 bg-zinc-900/30 rounded-2xl border border-dashed border-zinc-800 flex flex-col items-center gap-2">
               <HeartPulse size={24} className="text-zinc-700" />
               <p className="text-sm text-zinc-500 text-center">
-                {isEmergencyMode ? "Scanning for medical help..." : "Hospitals will appear here during emergency."}
+                Scanning for medical help nearby...
               </p>
             </div>
           )}

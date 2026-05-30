@@ -81,96 +81,95 @@ const EmergencyModal: React.FC = () => {
 
   const onCountdownComplete = async () => {
     stopAlerts();
+    setIsSending(true);
     
+    // 1. Dispatch SMS Alerts (non-blocking)
     if (contacts.length === 0) {
-      showPopup("No emergency contacts found.", 'info');
-      setShowSelection(true);
-      return;
+      showPopup("No emergency contacts set. Skipping SMS alert.", 'info');
+    } else {
+      try {
+        showPopup("Auto-dispatching background SMS alerts...", 'info');
+        await sendEmergencySMS(contacts, location);
+        showPopup("Emergency background alerts sent successfully!");
+        
+        // Add to Hospital Queue Automatically
+        try {
+          const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://lifesensorx.onrender.com');
+          await axios.post(`${BACKEND_URL}/api/queue`, {
+            name: "EMERGENCY APP USER",
+            age: 0,
+            gender: "Unknown",
+            severity: "CRITICAL",
+            consultationType: "TRAUMA"
+          });
+        } catch (queueErr) {
+          console.error("Could not add to hospital queue", queueErr);
+        }
+      } catch (error: any) {
+        console.error('Backend dispatch failed:', error);
+        showPopup(`Background SMS alert failed. Proceeding with hospital search...`, 'info');
+        setShowSelection(true); // Fallback to manual selection options in the modal
+      }
     }
 
-    try {
-      setIsSending(true);
-      showPopup("Auto-dispatching background SMS alerts...", 'info');
-      
-      await sendEmergencySMS(contacts, location);
+    setIsSending(false);
 
-      // Add to Hospital Queue Automatically
+    // Helper to fetch hospitals
+    const loadHospitals = async (lat: number, lng: number) => {
       try {
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://lifesensorx.onrender.com');
-        await axios.post(`${BACKEND_URL}/api/queue`, {
-          name: "EMERGENCY APP USER",
-          age: 0,
-          gender: "Unknown",
-          severity: "CRITICAL",
-          consultationType: "TRAUMA"
-        });
-      } catch (queueErr) {
-        console.error("Could not add to hospital queue", queueErr);
+        showPopup("Searching for nearby hospitals within 10 KM...", 'info');
+        const data = await fetchNearbyHospitals(lat, lng);
+        setHospitals(data);
+        showPopup("Nearby hospitals loaded successfully!");
+      } catch (hospitalErr: any) {
+        console.error("Failed to load hospitals post-countdown:", hospitalErr);
+        showPopup("Failed to search nearby hospitals.", 'info');
+      }
+    };
+
+    // 2. Fetch User's Current High-Accuracy Location and load real hospitals
+    if (navigator.geolocation) {
+      showPopup("Acquiring high-accuracy GPS coordinates...", 'info');
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          console.log(`[GPS] Fresh coordinates fetched after alarm: ${lat}, ${lng}`);
+          
+          // Sync location to emergency store
+          setLocation({ latitude: lat, longitude: lng, error: null });
+          await loadHospitals(lat, lng);
+          
+          // If we had contacts and sent SMS, or if the user needs to manually trigger options
+          if (contacts.length > 0 && !showSelection) {
+            closeEmergencyModal();
+          }
+        },
+        async (gpsErr) => {
+          console.warn("[GPS] Fresh location failed, using cached:", gpsErr);
+          if (location.latitude && location.longitude) {
+            showPopup("Using cached GPS coordinates...", 'info');
+            await loadHospitals(location.latitude, location.longitude);
+          } else {
+            showPopup("Could not determine location for hospital search.", 'info');
+          }
+          
+          if (contacts.length > 0 && !showSelection) {
+            closeEmergencyModal();
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      if (location.latitude && location.longitude) {
+        await loadHospitals(location.latitude, location.longitude);
+      } else {
+        showPopup("Could not determine location for hospital search.", 'info');
       }
       
-      showPopup("Emergency background alerts sent successfully!");
-      setIsSending(false);
-
-      // Automatically fetch the user’s current high-accuracy latitude and longitude
-      if (navigator.geolocation) {
-        showPopup("Acquiring high-accuracy GPS coordinates...", 'info');
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            console.log(`[GPS] Fresh coordinates fetched after alarm: ${lat}, ${lng}`);
-            
-            // Sync location to emergency store
-            setLocation({ latitude: lat, longitude: lng, error: null });
-            
-            try {
-              showPopup("Searching for nearby hospitals within 10 KM...", 'info');
-              const data = await fetchNearbyHospitals(lat, lng);
-              setHospitals(data);
-              showPopup("Nearby hospitals loaded successfully!");
-            } catch (hospitalErr: any) {
-              console.error("Failed to load hospitals post-countdown:", hospitalErr);
-              showPopup("Failed to search nearby hospitals.", 'info');
-            }
-          },
-          async (gpsErr) => {
-            console.warn("[GPS] Fresh location failed, using cached:", gpsErr);
-            // Fallback to existing coordinates
-            if (location.latitude && location.longitude) {
-              try {
-                showPopup("Searching for nearby hospitals (cached GPS)...", 'info');
-                const data = await fetchNearbyHospitals(location.latitude, location.longitude);
-                setHospitals(data);
-                showPopup("Nearby hospitals loaded successfully!");
-              } catch (hospitalErr) {
-                console.error("Failed to fetch hospitals using fallback:", hospitalErr);
-              }
-            } else {
-              showPopup("Could not determine location for hospital search.", 'info');
-            }
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      } else {
-        // Simple fallback
-        if (location.latitude && location.longitude) {
-          try {
-            const data = await fetchNearbyHospitals(location.latitude, location.longitude);
-            setHospitals(data);
-            showPopup("Nearby hospitals loaded!");
-          } catch (hospitalErr) {
-            console.error("Fallback hospital query failed:", hospitalErr);
-          }
-        }
+      if (contacts.length > 0 && !showSelection) {
+        closeEmergencyModal();
       }
-
-      closeEmergencyModal(); // Close the modal (but keep isEmergencyMode active so hospitals display on dashboard)
-    } catch (error: any) {
-      console.error('Backend dispatch failed:', error);
-      setIsSending(false);
-      const errorMsg = error.message || "Unknown error";
-      showPopup(`Background alert failed: ${errorMsg}`, 'info');
-      setShowSelection(true); // Fallback to manual selection
     }
   };
 
