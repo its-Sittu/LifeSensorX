@@ -37,7 +37,7 @@ flowchart TD
         E --> G[Query Resilient Hospital Finder]
     end
 
-    subgraph Backend ["📡 Backend Server (Node.js/Express/WebSockets)"]
+  subgraph Backend ["📡 Backend Server (Node.js/Express/WebSockets)"]
         F --> H[Format Phone Numbers & Parse SMS Template]
         H --> I[Dispatch Bulk SMS via Fast2SMS Gateway]
         
