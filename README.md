@@ -24,7 +24,7 @@ When a crash is detected by mobile device telematics, the application immediatel
 The following diagram outlines the complete end-to-end telemetry pipeline, alerting protocol, and real-time backend synchronization flows:
 
 ```mermaid
- flowchart TD
+flowchart TD
     subgraph Client ["📱 Client Application (React/Zustand)"]
         A[Start Monitoring] --> B[Device Motion Sensor Check]
         B -- "Collision Impact Triggered" --> C[Play Loud Alarm + Vibrate]
