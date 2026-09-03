@@ -124,10 +124,18 @@ out center tags;`;
           const dist = calculateDistanceKm(lat, lng, hLat, hLng);
           if (dist > 10.0) continue; // STRICT 10 KM LIMIT
 
-          const phone = place.tags?.phone || place.tags?.['contact:phone'] || place.tags?.['contact:mobile'] || place.tags?.['emergency:phone'] || '108';
+          const phone = place.tags?.phone || 
+                        place.tags?.['contact:phone'] || 
+                        place.tags?.['contact:mobile'] || 
+                        place.tags?.['emergency:phone'] || 
+                        place.tags?.['phone:emergency'] || 
+                        place.tags?.['operator:phone'] || 
+                        place.tags?.['healthcare:phone'] || 
+                        null;
+
           const street = place.tags?.['addr:street'] || place.tags?.['addr:suburb'] || place.tags?.['addr:district'] || '';
           const city = place.tags?.['addr:city'] || place.tags?.['addr:state'] || '';
-          const fullAddr = place.tags?.['addr:full'] || [street, city].filter(Boolean).join(', ') || 'Emergency Trauma Center';
+          const fullAddr = place.tags?.['addr:full'] || [street, city].filter(Boolean).join(', ') || place.tags?.['vicinity'] || 'Emergency Trauma Center';
 
           validList.push({
             name,
@@ -138,8 +146,8 @@ out center tags;`;
             isRecommended: validList.length === 0,
             distanceKm: parseFloat(dist.toFixed(2)),
             reason: validList.length === 0 
-              ? "Nearest trauma facility strictly within 10 km of your live GPS coordinates" 
-              : "Emergency hospital with active trauma and surgical support",
+              ? "Nearest emergency hospital within 10 km of your live GPS coordinates" 
+              : "Active medical trauma & critical care center",
             beds: {
               total: 60,
               occupied: 22,
@@ -200,7 +208,7 @@ out center tags;`;
                 name: place.name || place.display_name.split(',')[0],
                 address: place.display_name,
                 location: { lat: hLat, lng: hLng },
-                phone: "108",
+                phone: null,
                 score: Math.max(70, 98 - index * 4),
                 isRecommended: index === 0,
                 distanceKm: dist ? parseFloat(dist.toFixed(2)) : null,

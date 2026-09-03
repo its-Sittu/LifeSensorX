@@ -446,10 +446,18 @@ out center tags;`;
           const dist = calculateHaversineKm(userLat, userLng, hLat, hLng);
           if (dist > 10.0) continue; // STRICT 10 KM FILTER
 
-          const phone = place.tags?.phone || place.tags?.['contact:phone'] || place.tags?.['contact:mobile'] || place.tags?.['emergency:phone'] || '108';
+          const phone = place.tags?.phone || 
+                        place.tags?.['contact:phone'] || 
+                        place.tags?.['contact:mobile'] || 
+                        place.tags?.['emergency:phone'] || 
+                        place.tags?.['phone:emergency'] || 
+                        place.tags?.['operator:phone'] || 
+                        place.tags?.['healthcare:phone'] || 
+                        null;
+
           const street = place.tags?.['addr:street'] || place.tags?.['addr:suburb'] || place.tags?.['addr:district'] || '';
           const city = place.tags?.['addr:city'] || place.tags?.['addr:state'] || '';
-          const fullAddr = place.tags?.['addr:full'] || [street, city].filter(Boolean).join(', ') || 'Emergency Trauma Center';
+          const fullAddr = place.tags?.['addr:full'] || [street, city].filter(Boolean).join(', ') || place.tags?.['vicinity'] || 'Emergency Trauma Center';
           const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${hLat},${hLng}&travelmode=driving`;
 
           validList.push({
@@ -514,7 +522,7 @@ out center tags;`;
                 name: item.name || item.display_name.split(',')[0],
                 address: item.display_name,
                 location: { lat: hLat, lng: hLng },
-                phone: "108",
+                phone: null,
                 directionsUrl,
                 distanceKm: parseFloat(dist.toFixed(2))
               };

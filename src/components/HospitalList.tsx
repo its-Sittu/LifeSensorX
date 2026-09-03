@@ -166,9 +166,17 @@ const HospitalList: React.FC = () => {
                     </div>
 
                     <p className="text-zinc-500 text-[11px] mt-1 flex items-start gap-1">
-                      <MapPin size={12} className="shrink-0 mt-0.5" />
-                      {hospital.address}
+                      <MapPin size={12} className="shrink-0 mt-0.5 text-zinc-400" />
+                      <span>{hospital.address}</span>
                     </p>
+
+                    {/* Official Phone Number Badge */}
+                    {hospital.phone && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono font-medium mt-1 bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20 w-fit">
+                        <Phone size={11} className="shrink-0" />
+                        <span>{hospital.phone}</span>
+                      </div>
+                    )}
 
                     {/* AI Explainability Reason */}
                     {hospital.reason && (
@@ -193,15 +201,17 @@ const HospitalList: React.FC = () => {
 
                   <div className="flex items-center gap-2">
                     <a 
-                      href={`tel:${hospital.phone ? hospital.phone.replace(/[\s\-()]/g, '') : '108'}`}
-                      className="flex-1 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-600 hover:text-white transition-all active:scale-95 truncate px-2"
-                      title={hospital.phone || 'Call 108 Emergency Ambulance'}
+                      href={`tel:${hospital.phone ? hospital.phone.replace(/[\s\-()]/g, '') : '112'}`}
+                      className={`flex-1 py-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 px-2 ${
+                        hospital.phone
+                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white shadow-[0_0_12px_rgba(16,185,129,0.15)]'
+                          : 'bg-zinc-800/80 border-zinc-700/60 text-zinc-300 hover:bg-zinc-700 hover:text-white'
+                      }`}
+                      title={hospital.phone ? `Direct Call: ${hospital.phone}` : 'Call 112 Emergency Helpline'}
                     >
                       <Phone size={13} className="shrink-0" />
                       <span className="truncate">
-                        {hospital.phone && hospital.phone !== '108' && hospital.phone !== '+91-112' 
-                          ? `Call (${hospital.phone})` 
-                          : 'Call 108 Ambulance'}
+                        {hospital.phone ? 'Call Hospital' : 'Call 112 Helpline'}
                       </span>
                     </a>
                     <button 
@@ -212,7 +222,7 @@ const HospitalList: React.FC = () => {
                       className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-500 transition-all active:scale-95 shadow-[0_0_10px_rgba(37,99,235,0.2)] px-2"
                     >
                       <Navigation size={13} className="shrink-0" />
-                      <span>Directions</span>
+                      <span>Navigate</span>
                     </button>
                   </div>
                 </div>
