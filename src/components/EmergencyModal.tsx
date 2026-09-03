@@ -2,13 +2,13 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useEmergencyStore } from '../store/useEmergencyStore';
 import { sendEmergencySMS, fetchNearbyHospitals, getBackendUrl } from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, CheckCircle, Sparkles, Navigation, Phone, ShieldCheck } from 'lucide-react';
+import { Volume2, VolumeX, AlertTriangle, CheckCircle, Sparkles, Navigation, Phone, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
 import CountdownTimer from './CountdownTimer';
 import AlertPopup from './AlertPopup';
 import HospitalList from './HospitalList';
 
-import { startEmergencyAlarm, stopEmergencyAlarm } from '../utils/audioAlarm';
+import { startEmergencyAlarm, stopEmergencyAlarm, unlockAudio, registerAutoplayBlockedListener } from '../utils/audioAlarm';
 
 const COUNTDOWN_TIME = 10;
 
@@ -18,11 +18,18 @@ const EmergencyModal: React.FC = () => {
   const [showSelection, setShowSelection] = useState(false);
   const [isDispatched, setIsDispatched] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
   
   const { isEmergencyMode, showEmergencyModal, cancelEmergency, closeEmergencyModal, contacts, location, hospitals, setHospitals, setLocation } = useEmergencyStore();
 
   const stopAlerts = useCallback(() => {
     stopEmergencyAlarm();
+  }, []);
+
+  useEffect(() => {
+    registerAutoplayBlockedListener((blocked) => {
+      setIsAudioMuted(blocked);
+    });
   }, []);
 
   useEffect(() => {
@@ -202,7 +209,14 @@ const EmergencyModal: React.FC = () => {
               className="absolute inset-0 bg-red-600/30 rounded-full blur-3xl pointer-events-none"
             />
 
-            <div className="relative z-10 w-full max-w-md flex flex-col items-center text-center py-8">
+            <div 
+              onClick={() => {
+                unlockAudio();
+                startEmergencyAlarm();
+                setIsAudioMuted(false);
+              }}
+              className="relative z-10 w-full max-w-md flex flex-col items-center text-center py-8"
+            >
               
               {!isDispatched && !showSelection ? (
                 <>
@@ -210,6 +224,22 @@ const EmergencyModal: React.FC = () => {
                     <AlertTriangle size={40} className="text-white" />
                   </div>
                   <h1 className="text-3xl font-bold text-white mb-2 tracking-tight uppercase">Emergency!</h1>
+
+                  {isAudioMuted && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        unlockAudio();
+                        startEmergencyAlarm();
+                        setIsAudioMuted(false);
+                      }}
+                      className="mb-3 px-4 py-2 bg-amber-500/30 border border-amber-400/60 text-amber-200 rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse hover:bg-amber-500/40"
+                    >
+                      <Volume2 size={16} />
+                      Tap here to unmute loud siren
+                    </button>
+                  )}
+
                   <CountdownTimer 
                     timeLeft={timeLeft} 
                     setTimeLeft={setTimeLeft} 
