@@ -176,19 +176,13 @@ const HospitalList: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {hospital.phone ? (
-                      <a 
-                        href={`tel:${hospital.phone.replace(/\s+/g, '')}`}
-                        className="flex-1 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition-all active:scale-95"
-                      >
-                        <Phone size={14} />
-                        Call Now
-                      </a>
-                    ) : (
-                      <div className="flex-1 py-2 rounded-lg bg-zinc-800/50 text-zinc-500 text-[10px] font-medium flex items-center justify-center italic">
-                        Phone Unavailable
-                      </div>
-                    )}
+                    <a 
+                      href={`tel:${hospital.phone ? hospital.phone.replace(/\s+/g, '') : '112'}`}
+                      className="flex-1 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition-all active:scale-95"
+                    >
+                      <Phone size={14} />
+                      {hospital.phone && hospital.phone !== '+91-112' ? 'Call Hospital' : 'Call 112 (Ambulance)'}
+                    </a>
                     <button 
                       onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${hospital.location.lat},${hospital.location.lng}`, '_blank')}
                       className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-blue-500 transition-all active:scale-95 shadow-[0_0_10px_rgba(37,99,235,0.2)]"
