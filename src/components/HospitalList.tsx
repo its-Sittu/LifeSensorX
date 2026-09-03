@@ -36,10 +36,26 @@ const HospitalList: React.FC = () => {
   };
 
   useEffect(() => {
-    if (location.latitude && location.longitude) {
-      getHospitals(location.latitude, location.longitude);
+    let lat = location.latitude;
+    let lng = location.longitude;
+    
+    if (!lat || !lng) {
+      try {
+        const saved = localStorage.getItem('last_known_location');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.latitude && parsed.longitude) {
+            lat = parsed.latitude;
+            lng = parsed.longitude;
+          }
+        }
+      } catch (e) {}
     }
-  }, [location.latitude, location.longitude, setHospitals]);
+
+    if (lat && lng) {
+      getHospitals(lat, lng);
+    }
+  }, [location.latitude, location.longitude]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
