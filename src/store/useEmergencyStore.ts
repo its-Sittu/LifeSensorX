@@ -8,6 +8,7 @@ export interface Contact {
 }
 
 export interface Hospital {
+  _id?: string;
   name: string;
   address: string;
   location: {
@@ -15,6 +16,19 @@ export interface Hospital {
     lng: number;
   };
   phone?: string | null;
+  score?: number;
+  reason?: string;
+  isRecommended?: boolean;
+  distanceKm?: number | null;
+  beds?: {
+    total?: number;
+    occupied?: number;
+    available?: number;
+    icu?: { total?: number; occupied?: number; available?: number };
+    emergency?: { total?: number; occupied?: number; available?: number };
+  };
+  doctorsAvailable?: number;
+  emergencySupport?: boolean;
 }
 
 export interface LocationData {

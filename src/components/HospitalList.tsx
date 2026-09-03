@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useEmergencyStore } from '../store/useEmergencyStore';
 import { fetchNearbyHospitals } from '../utils/api';
-import { HeartPulse, Navigation, Loader2, Phone, MapPin, Search } from 'lucide-react';
+import { HeartPulse, Navigation, Loader2, Phone, MapPin, Search, Sparkles, BedDouble } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -11,8 +11,7 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   const a = 
     Math.sin(dLat/2) * Math.sin(dLat/2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2)
-    ; 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
   return R * c; // Distance in km
 };
@@ -52,7 +51,7 @@ const HospitalList: React.FC = () => {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
-          Nearby Hospitals
+          Nearby Hospitals & AI Triage
           {isEmergencyMode && <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
         </h3>
         {isLoading && <Loader2 size={18} className="text-blue-400 animate-spin" />}
@@ -103,7 +102,9 @@ const HospitalList: React.FC = () => {
           {hospitals.slice(0, 5).map((hospital, index) => {
             const distance = (location.latitude && location.longitude && hospital.location)
               ? calculateDistance(location.latitude, location.longitude, hospital.location.lat, hospital.location.lng).toFixed(1) + ' km'
-              : null;
+              : hospital.distanceKm ? `${hospital.distanceKm} km` : null;
+
+            const isTopRecommended = hospital.isRecommended || index === 0;
 
             return (
               <motion.div 
@@ -111,22 +112,67 @@ const HospitalList: React.FC = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="glass-card p-4 hover:bg-zinc-800/40 transition-all border border-zinc-800/50"
+                className={`glass-card p-4 hover:bg-zinc-800/40 transition-all border ${
+                  isTopRecommended 
+                    ? 'border-cyan-500/40 bg-gradient-to-br from-cyan-950/20 via-zinc-900/60 to-blue-950/20 shadow-[0_0_20px_rgba(6,182,212,0.15)]' 
+                    : 'border-zinc-800/50'
+                }`}
               >
                 <div className="flex flex-col gap-3">
                   <div>
+                    {/* Top Recommendation Badge */}
+                    {isTopRecommended && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-full w-fit mb-2">
+                        <Sparkles size={12} className="animate-pulse" />
+                        AI Recommended Hospital
+                        {hospital.score && (
+                          <span className="ml-1 px-1.5 py-0.2 bg-cyan-500/20 rounded font-mono text-[10px]">
+                            {hospital.score}/100
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="text-white font-bold text-sm leading-tight">{hospital.name}</h4>
-                      {distance && (
-                        <span className="text-[10px] bg-zinc-800 text-cyan-400 font-extrabold px-2 py-0.5 rounded-full shrink-0 border border-zinc-700/50 font-mono">
-                          {distance}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {hospital.score && !isTopRecommended && (
+                          <span className="text-[10px] bg-zinc-800/80 text-zinc-400 font-mono px-2 py-0.5 rounded-full border border-zinc-700/50">
+                            Score: {hospital.score}
+                          </span>
+                        )}
+                        {distance && (
+                          <span className="text-[10px] bg-zinc-800 text-cyan-400 font-extrabold px-2 py-0.5 rounded-full shrink-0 border border-zinc-700/50 font-mono">
+                            {distance}
+                          </span>
+                        )}
+                      </div>
                     </div>
+
                     <p className="text-zinc-500 text-[11px] mt-1 flex items-start gap-1">
                       <MapPin size={12} className="shrink-0 mt-0.5" />
                       {hospital.address}
                     </p>
+
+                    {/* AI Explainability Reason */}
+                    {hospital.reason && (
+                      <p className="text-[11px] text-cyan-300/80 mt-1.5 bg-zinc-950/60 p-1.5 rounded-lg border border-cyan-500/10 italic">
+                        💡 {hospital.reason}
+                      </p>
+                    )}
+
+                    {/* Bed Capacity Indicator */}
+                    {hospital.beds && (
+                      <div className="flex items-center gap-3 mt-2 text-[10px] text-zinc-400">
+                        <span className="flex items-center gap-1">
+                          <BedDouble size={12} className="text-emerald-400" />
+                          ICU Beds: <b className="text-zinc-200">{hospital.beds.icu?.available ?? 0}</b>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          Emergency Beds: <b className="text-zinc-200">{hospital.beds.emergency?.available ?? 0}</b>
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">

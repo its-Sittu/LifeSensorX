@@ -1,12 +1,18 @@
-import { LocationData, Contact } from '../store/useEmergencyStore';
+import { LocationData, Contact, Hospital } from '../store/useEmergencyStore';
 
-const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-  ? '' 
-  : 'https://lifesensorx.onrender.com';
+export const getBackendUrl = (): string => {
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? ''
+    : 'https://lifesensorx.onrender.com';
+};
 
 export const sendEmergencySMS = async (contacts: Contact[], location: LocationData) => {
   try {
-    const response = await fetch(`${BACKEND_URL}/send-alert`, {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/send-alert`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -27,13 +33,13 @@ export const sendEmergencySMS = async (contacts: Contact[], location: LocationDa
         const parsed = JSON.parse(text);
         errorMessage = parsed.error || errorMessage;
       } catch {
-        errorMessage = `Server responded with status ${response.status}. Please make sure the backend server is running on port 5000.`;
+        errorMessage = `Server responded with status ${response.status}. Please make sure the backend server is running.`;
       }
       throw new Error(errorMessage);
     }
 
     const data = await response.json().catch(() => {
-      throw new Error('Invalid response received from server. Check if the backend is running properly.');
+      throw new Error('Invalid response received from server.');
     });
     
     return data;
@@ -43,11 +49,16 @@ export const sendEmergencySMS = async (contacts: Contact[], location: LocationDa
   }
 };
 
-export const fetchNearbyHospitals = async (lat: number | null, lng: number | null, query: string | null = null) => {
+export const fetchNearbyHospitals = async (
+  lat: number | null, 
+  lng: number | null, 
+  query: string | null = null
+): Promise<Hospital[]> => {
   try {
+    const backendUrl = getBackendUrl();
     const url = query 
-      ? `${BACKEND_URL}/nearby-hospitals?query=${encodeURIComponent(query)}`
-      : `${BACKEND_URL}/nearby-hospitals?lat=${lat}&lng=${lng}`;
+      ? `${backendUrl}/nearby-hospitals?query=${encodeURIComponent(query)}`
+      : `${backendUrl}/nearby-hospitals?lat=${lat}&lng=${lng}`;
 
     const response = await fetch(url).catch(() => {
       throw new Error('Connection failed. Please ensure the backend server is running on port 5000.');
@@ -60,19 +71,37 @@ export const fetchNearbyHospitals = async (lat: number | null, lng: number | nul
         const parsed = JSON.parse(text);
         errorMessage = parsed.error || errorMessage;
       } catch {
-        errorMessage = `Server responded with status ${response.status}. Please make sure the backend server is running on port 5000.`;
+        errorMessage = `Server responded with status ${response.status}. Please make sure the backend server is running.`;
       }
       throw new Error(errorMessage);
     }
 
     const data = await response.json().catch(() => {
-      throw new Error('Invalid response received from server. Check if the backend is running properly.');
+      throw new Error('Invalid response received from server.');
     });
 
-    return data.results;
+    return data.results || [];
   } catch (error: any) {
     console.error('Hospitals API Error:', error);
     throw error;
   }
 };
 
+export const getRecommendedHospital = async (
+  lat: number, 
+  lng: number, 
+  severity: string = 'CRITICAL'
+) => {
+  try {
+    const backendUrl = getBackendUrl();
+    const url = `${backendUrl}/api/recommend-hospital?lat=${lat}&lng=${lng}&severity=${severity}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to get recommendation: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error: any) {
+    console.error('Hospital Recommendation Error:', error);
+    throw error;
+  }
+};

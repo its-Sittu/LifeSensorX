@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useEmergencyStore } from '../store/useEmergencyStore';
-import { generateWhatsAppLink } from '../utils/whatsapp';
-import { sendEmergencySMS, fetchNearbyHospitals } from '../utils/api';
+import { sendEmergencySMS, fetchNearbyHospitals, getBackendUrl } from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Sparkles, Navigation, Phone, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
 import CountdownTimer from './CountdownTimer';
 import AlertPopup from './AlertPopup';
@@ -15,8 +14,10 @@ const EmergencyModal: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(COUNTDOWN_TIME);
   const [popupMsg, setPopupMsg] = useState<{ text: string, type: 'success' | 'info' } | null>(null);
   const [showSelection, setShowSelection] = useState(false);
+  const [isDispatched, setIsDispatched] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   
-  const { isEmergencyMode, showEmergencyModal, cancelEmergency, closeEmergencyModal, contacts, location, setHospitals, setLocation } = useEmergencyStore();
+  const { isEmergencyMode, showEmergencyModal, cancelEmergency, closeEmergencyModal, contacts, location, hospitals, setHospitals, setLocation } = useEmergencyStore();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const stopAlerts = useCallback(() => {
@@ -33,6 +34,7 @@ const EmergencyModal: React.FC = () => {
     if (isEmergencyMode) {
       setTimeLeft(COUNTDOWN_TIME);
       setShowSelection(false);
+      setIsDispatched(false);
       
       // Play loud alarm
       try {
@@ -74,10 +76,9 @@ const EmergencyModal: React.FC = () => {
     stopAlerts();
     cancelEmergency();
     setShowSelection(false);
+    setIsDispatched(false);
     showPopup("Alert cancelled. Glad you're safe.");
   };
-
-  const [isSending, setIsSending] = useState(false);
 
   const onCountdownComplete = async () => {
     stopAlerts();
@@ -94,8 +95,8 @@ const EmergencyModal: React.FC = () => {
         
         // Add to Hospital Queue Automatically
         try {
-          const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://lifesensorx.onrender.com');
-          await axios.post(`${BACKEND_URL}/api/queue`, {
+          const backendUrl = getBackendUrl();
+          await axios.post(`${backendUrl}/api/queue`, {
             name: "EMERGENCY APP USER",
             age: 0,
             gender: "Unknown",
@@ -108,19 +109,20 @@ const EmergencyModal: React.FC = () => {
       } catch (error: any) {
         console.error('Backend dispatch failed:', error);
         showPopup(`Background SMS alert failed. Proceeding with hospital search...`, 'info');
-        setShowSelection(true); // Fallback to manual selection options in the modal
+        setShowSelection(true);
       }
     }
 
     setIsSending(false);
+    setIsDispatched(true);
 
     // Helper to fetch hospitals
     const loadHospitals = async (lat: number, lng: number) => {
       try {
-        showPopup("Searching for nearby hospitals within 10 KM...", 'info');
+        showPopup("Searching & AI ranking nearby hospitals...", 'info');
         const data = await fetchNearbyHospitals(lat, lng);
         setHospitals(data);
-        showPopup("Nearby hospitals loaded successfully!");
+        showPopup("Nearby hospitals & AI recommendation loaded!");
       } catch (hospitalErr: any) {
         console.error("Failed to load hospitals post-countdown:", hospitalErr);
         showPopup("Failed to search nearby hospitals.", 'info');
@@ -136,14 +138,8 @@ const EmergencyModal: React.FC = () => {
           const lng = position.coords.longitude;
           console.log(`[GPS] Fresh coordinates fetched after alarm: ${lat}, ${lng}`);
           
-          // Sync location to emergency store
           setLocation({ latitude: lat, longitude: lng, error: null });
           await loadHospitals(lat, lng);
-          
-          // If we had contacts and sent SMS, or if the user needs to manually trigger options
-          if (contacts.length > 0 && !showSelection) {
-            closeEmergencyModal();
-          }
         },
         async (gpsErr) => {
           console.warn("[GPS] Fresh location failed, using cached:", gpsErr);
@@ -153,10 +149,6 @@ const EmergencyModal: React.FC = () => {
           } else {
             showPopup("Could not determine location for hospital search.", 'info');
           }
-          
-          if (contacts.length > 0 && !showSelection) {
-            closeEmergencyModal();
-          }
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
@@ -165,10 +157,6 @@ const EmergencyModal: React.FC = () => {
         await loadHospitals(location.latitude, location.longitude);
       } else {
         showPopup("Could not determine location for hospital search.", 'info');
-      }
-      
-      if (contacts.length > 0 && !showSelection) {
-        closeEmergencyModal();
       }
     }
   };
@@ -191,7 +179,6 @@ const EmergencyModal: React.FC = () => {
 
     const message = getEmergencyMessage();
 
-    // IF ONLY 1 CONTACT: Open direct chat for maximum speed
     if (contacts.length === 1) {
       const phone = contacts[0].phone.replace(/\D/g, '');
       const finalPhone = phone.length === 10 ? `91${phone}` : phone;
@@ -202,7 +189,6 @@ const EmergencyModal: React.FC = () => {
       return;
     }
 
-    // IF MULTIPLE CONTACTS: Open WhatsApp's internal contact picker
     const link = `whatsapp://send?text=${encodeURIComponent(message)}`;
     window.open(link, '_blank');
     showPopup("Select your contacts in WhatsApp.");
@@ -212,10 +198,7 @@ const EmergencyModal: React.FC = () => {
   const sendSMS = () => {
     if (contacts.length > 0) {
       const message = getEmergencyMessage();
-      // Combine all phone numbers separated by commas
       const allPhones = contacts.map(c => c.phone.replace(/\D/g, '')).join(',');
-      
-      // On some iOS versions ';' is used, but ',' is standard for most modern phones
       const smsLink = `sms:${allPhones}?body=${encodeURIComponent(message)}`;
       window.open(smsLink, '_self');
       showPopup("Emergency message ready for all contacts. Please confirm in SMS app.");
@@ -224,6 +207,8 @@ const EmergencyModal: React.FC = () => {
       showPopup("No emergency contacts found.", 'info');
     }
   };
+
+  const recommendedHospital = hospitals.find(h => h.isRecommended) || hospitals[0] || null;
 
   return (
     <>
@@ -242,13 +227,13 @@ const EmergencyModal: React.FC = () => {
               className="absolute inset-0 bg-red-600/30 rounded-full blur-3xl pointer-events-none"
             />
 
-            <div className="relative z-10 w-full max-w-sm flex flex-col items-center text-center py-8">
-              <div className="w-20 h-20 mb-6 rounded-full bg-red-500 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.8)]">
-                <AlertTriangle size={40} className="text-white" />
-              </div>
-
-              {!showSelection ? (
+            <div className="relative z-10 w-full max-w-md flex flex-col items-center text-center py-8">
+              
+              {!isDispatched && !showSelection ? (
                 <>
+                  <div className="w-20 h-20 mb-6 rounded-full bg-red-500 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.8)]">
+                    <AlertTriangle size={40} className="text-white" />
+                  </div>
                   <h1 className="text-3xl font-bold text-white mb-2 tracking-tight uppercase">Emergency!</h1>
                   <CountdownTimer 
                     timeLeft={timeLeft} 
@@ -270,6 +255,82 @@ const EmergencyModal: React.FC = () => {
                     <HospitalList />
                   </div>
                 </>
+              ) : isDispatched ? (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="w-full flex flex-col items-center gap-4"
+                >
+                  <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.7)]">
+                    <ShieldCheck size={36} className="text-white" />
+                  </div>
+                  
+                  <h2 className="text-2xl font-bold text-white">Emergency Dispatched!</h2>
+                  <p className="text-xs text-red-200">
+                    Background SMS sent with your live GPS location link to emergency contacts.
+                  </p>
+
+                  {/* AI Recommended Hospital Box */}
+                  {recommendedHospital && (
+                    <div className="w-full glass-card p-5 text-left border border-cyan-500/40 bg-zinc-900/90 shadow-2xl mt-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-cyan-400">
+                          <Sparkles size={14} className="animate-pulse" />
+                          AI Recommended Hospital
+                        </span>
+                        {recommendedHospital.score && (
+                          <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono text-xs font-bold border border-cyan-500/30">
+                            {recommendedHospital.score}/100
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-white font-bold text-base leading-tight">
+                        {recommendedHospital.name}
+                      </h3>
+                      <p className="text-zinc-400 text-xs mt-1">
+                        {recommendedHospital.address}
+                      </p>
+
+                      {recommendedHospital.reason && (
+                        <p className="text-xs text-cyan-200 mt-2 p-2 bg-zinc-950/80 rounded-lg border border-cyan-500/10 italic">
+                          💡 {recommendedHospital.reason}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-2 mt-4">
+                        {recommendedHospital.phone && (
+                          <a 
+                            href={`tel:${recommendedHospital.phone.replace(/\s+/g, '')}`}
+                            className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-500 hover:text-white transition-all active:scale-95"
+                          >
+                            <Phone size={14} />
+                            Call Hospital
+                          </a>
+                        )}
+                        <button 
+                          onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${recommendedHospital.location.lat},${recommendedHospital.location.lng}`, '_blank')}
+                          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                        >
+                          <Navigation size={14} />
+                          Directions
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="w-full flex gap-3 mt-4">
+                    <button 
+                      onClick={() => {
+                        cancelEmergency();
+                        closeEmergencyModal();
+                      }}
+                      className="flex-1 py-3 rounded-xl bg-white text-red-600 font-bold text-sm shadow-[0_0_15px_rgba(255,255,255,0.2)] active:scale-95 transition-all"
+                    >
+                      I'm Safe Now (Dismiss)
+                    </button>
+                  </div>
+                </motion.div>
               ) : (
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}

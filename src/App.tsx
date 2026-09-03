@@ -9,6 +9,7 @@ import LocationPermissionModal from './components/LocationPermissionModal';
 import { ShieldAlert, MapPin, Building2 } from 'lucide-react';
 import { useLocation } from './hooks/useLocation';
 import { useEmergencyStore } from './store/useEmergencyStore';
+import { getBackendUrl } from './utils/api';
 
 // Admin Components
 import AdminLayout from './components/hospital/AdminLayout';
@@ -36,7 +37,10 @@ const App: React.FC = () => {
 
   // Warm up the backend API on load
   useEffect(() => {
-    fetch('https://lifesensorx.onrender.com').catch(() => {});
+    const backendUrl = getBackendUrl();
+    if (backendUrl) {
+      fetch(backendUrl).catch(() => {});
+    }
   }, []);
 
   return (

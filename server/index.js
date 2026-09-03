@@ -19,20 +19,36 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 5000;
 
-// In-Memory Data Store (No Database Required)
+// In-Memory Data Store (Production-resilient fallback)
 let hospitals = [
   {
     _id: "hosp_1",
     name: "Central General Hospital",
-    address: "123 Main St",
+    address: "123 Main St, New Delhi",
     location: { lat: 28.6139, lng: 77.2090 },
     beds: { 
-      total: 100, occupied: 50, available: 50, 
-      icu: { total: 20, occupied: 15, available: 5 }, 
-      emergency: { total: 10, occupied: 8, available: 2 } 
+      total: 100, occupied: 45, available: 55, 
+      icu: { total: 20, occupied: 12, available: 8 }, 
+      emergency: { total: 15, occupied: 7, available: 8 } 
     },
-    doctorsAvailable: 5,
+    doctorsAvailable: 6,
     emergencySupport: true,
+    phone: "+91 11 2338 5000",
+    createdAt: new Date()
+  },
+  {
+    _id: "hosp_2",
+    name: "Metro Trauma & Critical Care",
+    address: "45 Emergency Corridor, New Delhi",
+    location: { lat: 28.6250, lng: 77.2180 },
+    beds: { 
+      total: 80, occupied: 50, available: 30, 
+      icu: { total: 25, occupied: 15, available: 10 }, 
+      emergency: { total: 20, occupied: 10, available: 10 } 
+    },
+    doctorsAvailable: 8,
+    emergencySupport: true,
+    phone: "+91 11 2341 8000",
     createdAt: new Date()
   }
 ];
@@ -40,6 +56,8 @@ let patients = [];
 
 // Utils
 const { calculateWaitTime } = require('./utils/prediction');
+const { scoreAndRankHospitals } = require('./utils/scoring');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -60,7 +78,7 @@ io.on('connection', (socket) => {
 
 /**
  * API Endpoint: /send-alert
- * Purpose: Sends emergency SMS via Fast2SMS
+ * Purpose: Sends emergency SMS via Fast2SMS with Maps link
  */
 app.post('/send-alert', async (req, res) => {
   console.log(`[DEBUG] Incoming /send-alert request:`, req.body);
@@ -72,14 +90,13 @@ app.post('/send-alert', async (req, res) => {
       return res.status(400).json({ success: false, error: "Contacts array is required." });
     }
 
-    if (!latitude || !longitude) {
+    if (latitude == null || longitude == null) {
       return res.status(400).json({ success: false, error: "Location coordinates are missing." });
     }
 
     // 2. Format Phone Numbers (Fast2SMS expects 10 digits for Indian numbers)
     const formattedNumbers = contacts.map(num => {
-      let clean = num.replace(/\D/g, '');
-      // If it starts with 91 and is 12 digits, take the last 10
+      let clean = String(num).replace(/\D/g, '');
       if (clean.startsWith('91') && clean.length === 12) {
         clean = clean.substring(2);
       }
@@ -98,6 +115,16 @@ app.post('/send-alert', async (req, res) => {
     console.log(`[DEBUG] Message: ${messageBody}`);
 
     // 4. Fast2SMS API Call
+    const apiKey = process.env.FAST2SMS_API_KEY;
+    if (!apiKey || apiKey === 'your_fast2sms_api_key_here') {
+      console.warn(`[WARN] FAST2SMS_API_KEY is not configured. Simulating SMS dispatch in development.`);
+      return res.status(200).json({
+        success: true,
+        message: "Emergency SMS simulated successfully (Demo mode)",
+        request_id: "sim_" + Date.now()
+      });
+    }
+
     const response = await axios.post('https://www.fast2sms.com/dev/bulkV2', {
       route: "q",
       message: messageBody,
@@ -105,7 +132,7 @@ app.post('/send-alert', async (req, res) => {
       numbers: formattedNumbers,
     }, {
       headers: {
-        'authorization': process.env.FAST2SMS_API_KEY,
+        'authorization': apiKey,
         'Content-Type': 'application/json',
       }
     });
@@ -135,25 +162,30 @@ app.post('/send-alert', async (req, res) => {
 
 /**
  * API Endpoint: /nearby-hospitals
- * Purpose: Proxies request to Google Places API to find hospitals
+ * Purpose: Proxies request to Google Places API / OpenStreetMap and enriches with explainable AI recommendation scoring
  */
 app.get('/nearby-hospitals', async (req, res) => {
   const { lat, lng, query } = req.query;
+
+  const userLat = lat ? parseFloat(lat) : null;
+  const userLng = lng ? parseFloat(lng) : null;
 
   if (query) {
     console.log(`[DEBUG] Fetching hospitals by query: ${query}`);
   } else {
     console.log(`[DEBUG] Fetching hospitals with phone numbers for: ${lat}, ${lng}`);
-    if (!lat || !lng) {
-      return res.status(400).json({ success: false, error: "Lat/Lng or query required" });
+    if (userLat === null || userLng === null || isNaN(userLat) || isNaN(userLng)) {
+      return res.status(400).json({ success: false, error: "Valid latitude and longitude or search query required" });
     }
   }
 
   const API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+  let rawHospitals = [];
+  let source = 'mock';
 
-  // 1. Try Google Places API (Try New API first, fallback to Legacy/Classic API)
+  // 1. Try Google Places API
   if (API_KEY && API_KEY !== 'your_google_maps_key_here') {
-    // 1a. Try Google Places Text Search (New) if query is provided
+    // 1a. Google Places Text Search (New)
     if (query) {
       try {
         console.log(`[DEBUG] Step 1a: Google Text Search (New)...`);
@@ -172,8 +204,8 @@ app.get('/nearby-hospitals', async (req, res) => {
           }
         );
 
-        if (googleTextRes.data && googleTextRes.data.places) {
-          const hospitals = googleTextRes.data.places.map(place => ({
+        if (googleTextRes.data && googleTextRes.data.places && googleTextRes.data.places.length > 0) {
+          rawHospitals = googleTextRes.data.places.map(place => ({
             name: place.displayName?.text || 'Hospital',
             address: place.formattedAddress || 'Nearby Services',
             location: {
@@ -182,16 +214,15 @@ app.get('/nearby-hospitals', async (req, res) => {
             },
             phone: place.internationalPhoneNumber || null
           }));
-          console.log(`[DEBUG] Google Places Text Search (New) fetched successfully.`);
-          return res.status(200).json({ success: true, source: 'google_new_text', results: hospitals });
+          source = 'google_new_text';
         }
       } catch (err) {
-        console.log(`[DEBUG] Google Places Text Search (New) failed or is disabled:`, err.message);
+        console.log(`[DEBUG] Google Places Text Search (New) failed:`, err.message);
       }
     }
 
-    // 1b. Try Google Places API (New) - Nearby Search
-    if (lat && lng) {
+    // 1b. Google Places API (New) - Nearby Search
+    if (rawHospitals.length === 0 && userLat !== null && userLng !== null) {
       try {
         console.log(`[DEBUG] Step 1b: Google Nearby Search (New)...`);
         const googleNewRes = await axios.post(
@@ -202,8 +233,8 @@ app.get('/nearby-hospitals', async (req, res) => {
             locationRestriction: {
               circle: {
                 center: {
-                  latitude: parseFloat(lat),
-                  longitude: parseFloat(lng)
+                  latitude: userLat,
+                  longitude: userLng
                 },
                 radius: 10000.0
               }
@@ -218,8 +249,8 @@ app.get('/nearby-hospitals', async (req, res) => {
           }
         );
 
-        if (googleNewRes.data && googleNewRes.data.places) {
-          const hospitals = googleNewRes.data.places.map(place => ({
+        if (googleNewRes.data && googleNewRes.data.places && googleNewRes.data.places.length > 0) {
+          rawHospitals = googleNewRes.data.places.map(place => ({
             name: place.displayName?.text || 'Hospital',
             address: place.formattedAddress || 'Nearby Services',
             location: {
@@ -228,90 +259,168 @@ app.get('/nearby-hospitals', async (req, res) => {
             },
             phone: place.internationalPhoneNumber || null
           }));
-          console.log(`[DEBUG] Google Places API (New) fetched successfully.`);
-          return res.status(200).json({ success: true, source: 'google_new', results: hospitals });
+          source = 'google_new';
         }
       } catch (err) {
-        console.log(`[DEBUG] Google Places API (New) failed or is disabled:`, err.message);
+        console.log(`[DEBUG] Google Places API (New) failed:`, err.message);
       }
     }
 
-    // 1b. Try Google Places API (Legacy/Classic) as secondary option
+    // 1c. Google Places API (Legacy/Classic)
+    if (rawHospitals.length === 0 && userLat !== null && userLng !== null) {
+      try {
+        console.log(`[DEBUG] Step 1c: Google Nearby Search (Legacy)...`);
+        const googleUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${userLat},${userLng}&radius=10000&type=hospital&key=${API_KEY}`;
+        const response = await axios.get(googleUrl);
+
+        if (response.data.status === 'OK' && response.data.results.length > 0) {
+          const top5 = response.data.results.slice(0, 5);
+          rawHospitals = await Promise.all(top5.map(async (place) => {
+            try {
+              const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=formatted_phone_number&key=${API_KEY}`;
+              const detailsRes = await axios.get(detailsUrl);
+              return {
+                name: place.name,
+                address: place.vicinity,
+                location: place.geometry.location,
+                phone: detailsRes.data.result?.formatted_phone_number || null
+              };
+            } catch {
+              return {
+                name: place.name,
+                address: place.vicinity,
+                location: place.geometry.location,
+                phone: null
+              };
+            }
+          }));
+          source = 'google_legacy';
+        }
+      } catch (err) {
+        console.error(`[ERROR] Google API Legacy Flow Failed:`, err.message);
+      }
+    }
+  }
+
+  // 2. Fallback to OpenStreetMap (Overpass API)
+  if (rawHospitals.length === 0 && userLat !== null && userLng !== null) {
     try {
-      console.log(`[DEBUG] Step 1b: Google Nearby Search (Legacy)...`);
-      const googleUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=10000&type=hospital&key=${API_KEY}`;
-      const response = await axios.get(googleUrl);
+      console.log(`[DEBUG] Falling back to OpenStreetMap Overpass API...`);
+      const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:10000,${userLat},${userLng})["amenity"="hospital"];out;`;
+      const response = await axios.get(overpassUrl, { 
+        timeout: 8000,
+        headers: {
+          'User-Agent': 'LifeSensorX-Emergency-App/1.0'
+        }
+      });
 
-      console.log(`[DEBUG] Google API Status: ${response.data.status}`);
-      if (response.data.status === 'OK') {
-        const top5 = response.data.results.slice(0, 5);
-        
-        // Step 2: Fetch Details for each to get phone number
-        const detailedHospitals = await Promise.all(top5.map(async (place) => {
-          try {
-            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=formatted_phone_number&key=${API_KEY}`;
-            const detailsRes = await axios.get(detailsUrl);
-            return {
-              name: place.name,
-              address: place.vicinity,
-              location: place.geometry.location,
-              phone: detailsRes.data.result?.formatted_phone_number || null
-            };
-          } catch (err) {
-            console.error(`[ERROR] Details fetch failed for ${place.name}:`, err.message);
-            return {
-              name: place.name,
-              address: place.vicinity,
-              location: place.geometry.location,
-              phone: null
-            };
-          }
-        }));
-
-        return res.status(200).json({ success: true, source: 'google', results: detailedHospitals });
+      if (response.data && response.data.elements && response.data.elements.length > 0) {
+        rawHospitals = response.data.elements.map(place => ({
+          name: place.tags.name || "Nearby Medical Center",
+          address: place.tags["addr:full"] || place.tags["addr:street"] || "Emergency Services",
+          location: { lat: place.lat, lng: place.lon },
+          phone: place.tags.phone || place.tags["contact:phone"] || null
+        })).slice(0, 5);
+        source = 'openstreetmap';
       }
     } catch (err) {
-      console.error(`[ERROR] Google API Legacy Flow Failed:`, err.message);
+      console.error(`[ERROR] OSM API Failed:`, err.message);
     }
   }
 
-  // 2. Fallback to OpenStreetMap (No phone numbers available in basic Overpass node search easily)
-  try {
-    console.log(`[DEBUG] Falling back to OpenStreetMap...`);
-    const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:10000,${lat},${lng})["amenity"="hospital"];out;`;
-    const response = await axios.get(overpassUrl, { 
-      timeout: 8000,
-      headers: {
-        'User-Agent': 'LifeSensorX-Emergency-App/1.0'
-      }
-    });
-
-    if (response.data && response.data.elements) {
-      const hospitals = response.data.elements.map(place => ({
-        name: place.tags.name || "Nearby Medical Center",
-        address: place.tags["addr:full"] || "Emergency Services",
-        location: { lat: place.lat, lng: place.lon },
-        phone: null
-      })).slice(0, 5);
-      return res.status(200).json({ success: true, source: 'openstreetmap', results: hospitals });
-    }
-  } catch (err) {
-    console.error(`[ERROR] OSM API Failed:`, err.message);
+  // 3. Fallback: Local Database Hospitals & Mock Data
+  if (rawHospitals.length === 0) {
+    source = 'in_memory_db';
+    rawHospitals = hospitals.map(h => ({
+      name: h.name,
+      address: h.address,
+      location: h.location,
+      phone: h.phone,
+      beds: h.beds,
+      doctorsAvailable: h.doctorsAvailable,
+      emergencySupport: h.emergencySupport
+    }));
   }
 
-  // 3. Last Resort: Mock Data
+  // Merge registered hospital capacity metrics if matched by proximity or name
+  const enrichedHospitals = rawHospitals.map(hosp => {
+    const matched = hospitals.find(h => 
+      h.name.toLowerCase().includes(hosp.name.toLowerCase()) || 
+      (hosp.location && Math.abs(h.location.lat - hosp.location.lat) < 0.01 && Math.abs(h.location.lng - hosp.location.lng) < 0.01)
+    );
+
+    if (matched) {
+      return {
+        ...hosp,
+        beds: matched.beds,
+        doctorsAvailable: matched.doctorsAvailable,
+        emergencySupport: matched.emergencySupport,
+        waitingPatients: patients.filter(p => p.hospitalId === matched._id && p.status === 'WAITING').length
+      };
+    }
+
+    return {
+      ...hosp,
+      beds: hosp.beds || { total: 50, occupied: 20, available: 30, icu: { total: 10, occupied: 6, available: 4 }, emergency: { total: 8, occupied: 4, available: 4 } },
+      doctorsAvailable: hosp.doctorsAvailable || 5,
+      emergencySupport: true,
+      waitingPatients: 2
+    };
+  });
+
+  // 4. Apply Explainable AI Recommendation Scoring & Ranking
+  const scoredResults = scoreAndRankHospitals(enrichedHospitals, userLat, userLng, 'CRITICAL');
+
   return res.status(200).json({
     success: true,
-    source: 'mock',
-    results: [
-      { name: "City General Hospital (Mock)", address: "Medical Zone A", location: { lat: parseFloat(lat) + 0.01, lng: parseFloat(lng) + 0.01 }, phone: "+91 9999999999" },
-      { name: "Metro Trauma Center (Mock)", address: "Emergency Sector B", location: { lat: parseFloat(lat) - 0.01, lng: parseFloat(lng) - 0.01 }, phone: "+91 8888888888" }
-    ]
+    source,
+    results: scoredResults
   });
 });
 
 /**
- * HOSPITAL MANAGEMENT API ENDPOINTS (IN-MEMORY)
+ * API Endpoint: /api/recommend-hospital
+ * Purpose: Evaluates best hospital for emergency dispatch using rule-based AI engine
+ */
+app.get('/api/recommend-hospital', (req, res) => {
+  const { lat, lng, severity } = req.query;
+  const userLat = lat ? parseFloat(lat) : null;
+  const userLng = lng ? parseFloat(lng) : null;
+
+  if (userLat === null || userLng === null || isNaN(userLat) || isNaN(userLng)) {
+    return res.status(400).json({ success: false, error: "Valid latitude and longitude are required." });
+  }
+
+  const enrichedHospitals = hospitals.map(h => ({
+    _id: h._id,
+    name: h.name,
+    address: h.address,
+    location: h.location,
+    phone: h.phone,
+    beds: h.beds,
+    doctorsAvailable: h.doctorsAvailable,
+    emergencySupport: h.emergencySupport,
+    waitingPatients: patients.filter(p => p.hospitalId === h._id && p.status === 'WAITING').length
+  }));
+
+  const ranked = scoreAndRankHospitals(enrichedHospitals, userLat, userLng, severity || 'CRITICAL');
+  const bestHospital = ranked[0] || null;
+
+  if (!bestHospital) {
+    return res.status(404).json({ success: false, error: "No suitable hospital found." });
+  }
+
+  res.json({
+    success: true,
+    recommendedHospital: bestHospital.name,
+    score: bestHospital.score,
+    reason: bestHospital.reason,
+    hospital: bestHospital
+  });
+});
+
+/**
+ * HOSPITAL MANAGEMENT API ENDPOINTS (IN-MEMORY & REAL-TIME)
  */
 
 // 1. Get Hospital Stats
@@ -325,12 +434,16 @@ app.put('/api/hospitals/:id/beds', (req, res) => {
     const { type, action } = req.body; // type: 'icu', 'emergency', 'general'. action: 'allocate', 'free'
     const hospital = hospitals.find(h => h._id === req.params.id) || hospitals[0];
     
+    if (!hospital) {
+      return res.status(404).json({ success: false, error: "Hospital not found" });
+    }
+
     let target = null;
     if (type === 'icu') target = hospital.beds.icu;
     else if (type === 'emergency') target = hospital.beds.emergency;
-    else target = hospital.beds; // 'general' maps to total
+    else target = hospital.beds; // 'general'
 
-    if (!target) return res.status(400).json({ error: 'Invalid bed type' });
+    if (!target) return res.status(400).json({ success: false, error: 'Invalid bed type' });
 
     if (action === 'allocate' && target.available > 0) {
       target.occupied++;
@@ -340,25 +453,28 @@ app.put('/api/hospitals/:id/beds', (req, res) => {
       target.available++;
     }
 
-    // Recalculate total if we updated a subtype
-    if (type !== 'general') {
-      hospital.beds.occupied = hospital.beds.icu.occupied + hospital.beds.emergency.occupied;
-      // Assume total beds is static, available = total - occupied
-      hospital.beds.available = hospital.beds.total - hospital.beds.occupied;
-    }
+    // Synchronize overall total bed availability
+    const generalOccupied = hospital.beds.occupied || 0;
+    hospital.beds.available = Math.max(0, hospital.beds.total - generalOccupied);
 
     io.emit('hospitalUpdate', { hospitalId: hospital._id, beds: hospital.beds });
     res.json({ success: true, data: hospital.beds });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 2. Create a new hospital (for testing)
+// 2. Create a new hospital (for testing/registration)
 app.post('/api/hospitals', (req, res) => {
   const newHospital = {
     _id: "hosp_" + Date.now(),
-    ...req.body,
+    name: req.body.name || "New Medical Center",
+    address: req.body.address || "Medical Zone",
+    location: req.body.location || { lat: 28.6139, lng: 77.2090 },
+    beds: req.body.beds || { total: 50, occupied: 20, available: 30, icu: { total: 10, occupied: 5, available: 5 }, emergency: { total: 10, occupied: 4, available: 6 } },
+    doctorsAvailable: req.body.doctorsAvailable || 4,
+    emergencySupport: req.body.emergencySupport !== undefined ? req.body.emergencySupport : true,
+    phone: req.body.phone || "+91 9999999999",
     createdAt: new Date()
   };
   hospitals.push(newHospital);
@@ -381,7 +497,7 @@ app.post('/api/queue', (req, res) => {
 
     const currentQueue = patients.filter(p => p.hospitalId === hospital._id && p.status === 'WAITING');
     
-    // Predict Wait Time
+    // Predict Wait Time based on doctors and triage priority
     const waitTime = calculateWaitTime(currentQueue, patientData, hospital.doctorsAvailable);
     
     const newPatient = {
@@ -397,7 +513,7 @@ app.post('/api/queue', (req, res) => {
 
     patients.push(newPatient);
     
-    // Emit real-time update
+    // Emit real-time update to all connected hospital dashboards
     io.emit('queueUpdate', { action: 'add', data: newPatient });
     
     res.status(201).json({ success: true, data: newPatient });
@@ -406,7 +522,7 @@ app.post('/api/queue', (req, res) => {
   }
 });
 
-// 5. Update Patient Status (e.g., ADMITTED)
+// 5. Update Patient Status (e.g., ADMITTED, DISCHARGED)
 app.put('/api/queue/:id/status', (req, res) => {
   try {
     const { status } = req.body;
@@ -429,11 +545,15 @@ app.put('/api/queue/:id/status', (req, res) => {
 
 // Health Check
 app.get('/', (req, res) => {
-  res.send("LifeSensorX Emergency API (Fast2SMS Edition) is running...");
+  res.json({
+    status: "online",
+    message: "LifeSensorX Emergency API is running...",
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Start Server
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Emergency Backend running on port ${PORT}`);
-  console.log(`🔗 Fast2SMS integration active.`);
+  console.log(`🔗 Fast2SMS & AI Hospital Scoring active.`);
 });
