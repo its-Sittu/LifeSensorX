@@ -68,11 +68,221 @@ app.use((req, res, next) => {
   next();
 });
 
+// In-Memory IoT Hardware Device Tracker
+const activeDevices = new Map();
+const CRASH_DEBOUNCE_MS = 10000; // 10s cooldown per device to prevent accident duplicate storm
+
 // Socket.io Connection
 io.on('connection', (socket) => {
   console.log(`🔌 Client connected: ${socket.id}`);
+  
+  // Send current IoT device status on connection
+  const deviceList = Array.from(activeDevices.values());
+  socket.emit('deviceStatusInitial', deviceList);
+
   socket.on('disconnect', () => {
     console.log(`🔌 Client disconnected: ${socket.id}`);
+  });
+});
+
+/**
+ * API Endpoint: POST /api/device/crash
+ * Purpose: Receives telemetry and crash events from ESP32 + MPU6050/MPU6500 IoT hardware
+ */
+app.post('/api/device/crash', (req, res) => {
+  try {
+    const { 
+      deviceId, 
+      acceleration, 
+      gyroscope, 
+      magnitude,
+      ax, ay, az, 
+      gx, gy, gz,
+      crashDetected, 
+      crash,
+      timestamp 
+    } = req.body;
+
+    console.log(`[ESP32] Request received at /api/device/crash:`, req.body);
+
+    // 1. Device Authentication / API Key check (if configured)
+    const configuredApiKey = process.env.DEVICE_API_KEY;
+    const incomingApiKey = req.headers['x-device-api-key'] || req.headers['authorization'];
+    if (configuredApiKey && incomingApiKey !== configuredApiKey) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Invalid or missing x-device-api-key" });
+    }
+
+    // 2. Validate deviceId
+    if (!deviceId || typeof deviceId !== 'string' || deviceId.trim().length === 0) {
+      return res.status(400).json({ success: false, error: "Validation failed: 'deviceId' is required." });
+    }
+
+    const cleanDeviceId = deviceId.trim();
+
+    // 3. Extract and Validate Acceleration Data
+    const accX = Number(acceleration?.x ?? ax ?? 0);
+    const accY = Number(acceleration?.y ?? ay ?? 0);
+    const accZ = Number(acceleration?.z ?? az ?? 0);
+
+    if (isNaN(accX) || isNaN(accY) || isNaN(accZ)) {
+      return res.status(400).json({ success: false, error: "Validation failed: Acceleration (x, y, z) must be valid numbers." });
+    }
+
+    // 4. Extract and Validate Gyroscope Data
+    const gyroX = Number(gyroscope?.x ?? gx ?? 0);
+    const gyroY = Number(gyroscope?.y ?? gy ?? 0);
+    const gyroZ = Number(gyroscope?.z ?? gz ?? 0);
+
+    if (isNaN(gyroX) || isNaN(gyroY) || isNaN(gyroZ)) {
+      return res.status(400).json({ success: false, error: "Validation failed: Gyroscope (x, y, z) must be valid numbers." });
+    }
+
+    // 5. Parse crash detection boolean & magnitude
+    const isCrash = Boolean(crashDetected === true || crashDetected === 'true' || crash === true || crash === 'true');
+    const calculatedMag = parseFloat(Math.sqrt(accX * accX + accY * accY + accZ * accZ).toFixed(3));
+    const finalMagnitude = magnitude !== undefined && !isNaN(Number(magnitude)) ? Number(magnitude) : calculatedMag;
+    const eventTime = timestamp ? new Date(timestamp).getTime() || Date.now() : Date.now();
+
+    const existingDevice = activeDevices.get(cleanDeviceId) || {
+      deviceId: cleanDeviceId,
+      firstSeen: new Date(eventTime).toISOString(),
+      crashCount: 0,
+      lastCrashTime: 0
+    };
+
+    const telemetry = {
+      acceleration: { x: accX, y: accY, z: accZ },
+      gyroscope: { x: gyroX, y: gyroY, z: gyroZ },
+      magnitude: finalMagnitude
+    };
+
+    const now = Date.now();
+
+    // 6. Handle Crash Detected Event
+    if (isCrash) {
+      console.log(`[ESP32] Crash received from ${cleanDeviceId} (Magnitude: ${finalMagnitude})`);
+
+      // Duplicate-Event / Debounce Protection (10-second cooldown per device)
+      if (now - existingDevice.lastCrashTime < CRASH_DEBOUNCE_MS) {
+        console.warn(`[IOT] Duplicate crash event suppressed for device ${cleanDeviceId} within debounce window.`);
+        return res.status(200).json({
+          success: true,
+          message: "Duplicate crash event suppressed within cooldown period",
+          deviceId: cleanDeviceId,
+          debounced: true,
+          timestamp: eventTime
+        });
+      }
+
+      existingDevice.lastCrashTime = now;
+      existingDevice.crashCount = (existingDevice.crashCount || 0) + 1;
+      existingDevice.lastSeen = new Date(now).toISOString();
+      existingDevice.telemetry = telemetry;
+      existingDevice.status = 'CRASH_ALERT';
+
+      activeDevices.set(cleanDeviceId, existingDevice);
+
+      const crashPayload = {
+        source: 'ESP32_HARDWARE',
+        deviceId: cleanDeviceId,
+        acceleration: { x: accX, y: accY, z: accZ },
+        gyroscope: { x: gyroX, y: gyroY, z: gyroZ },
+        magnitude: finalMagnitude,
+        crashDetected: true,
+        timestamp: eventTime
+      };
+
+      // Broadcast crash event to React frontend over Socket.io
+      io.emit('crashDetected', crashPayload);
+      console.log(`[Socket.io] crashDetected emitted:`, crashPayload);
+
+      // Also update device status
+      io.emit('deviceStatusUpdate', {
+        deviceId: cleanDeviceId,
+        status: 'CRASH_ALERT',
+        lastSeen: existingDevice.lastSeen,
+        telemetry
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Crash event received and forwarded to emergency notification system",
+        deviceId: cleanDeviceId,
+        timestamp: eventTime,
+        magnitude: finalMagnitude,
+        emergencyTriggered: true
+      });
+    }
+
+    // 7. Regular Telemetry / Heartbeat Update (crashDetected === false)
+    existingDevice.lastSeen = new Date(now).toISOString();
+    existingDevice.telemetry = telemetry;
+    existingDevice.status = 'ONLINE';
+
+    activeDevices.set(cleanDeviceId, existingDevice);
+
+    io.emit('deviceStatusUpdate', {
+      deviceId: cleanDeviceId,
+      status: 'ONLINE',
+      lastSeen: existingDevice.lastSeen,
+      telemetry
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Telemetry heartbeat processed successfully",
+      deviceId: cleanDeviceId,
+      timestamp: eventTime,
+      status: "ONLINE"
+    });
+
+  } catch (error) {
+    console.error("[ERROR] IoT Device Crash Endpoint Failure:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error processing device telemetry",
+      detail: error.message
+    });
+  }
+});
+
+/**
+ * API Endpoint: GET /api/device/status
+ * Purpose: Returns connected IoT devices and their latest sensor telemetry
+ */
+app.get('/api/device/status', (req, res) => {
+  const { deviceId } = req.query;
+  const now = Date.now();
+
+  if (deviceId) {
+    const device = activeDevices.get(String(deviceId));
+    if (!device) {
+      return res.status(404).json({ success: false, error: `Device '${deviceId}' not found or has not reported yet.` });
+    }
+    const isOnline = (now - new Date(device.lastSeen).getTime()) < 60000;
+    return res.json({
+      success: true,
+      device: {
+        ...device,
+        isOnline,
+        status: isOnline ? device.status : 'OFFLINE'
+      }
+    });
+  }
+
+  const allDevices = Array.from(activeDevices.values()).map(dev => {
+    const isOnline = (now - new Date(dev.lastSeen).getTime()) < 60000;
+    return {
+      ...dev,
+      isOnline,
+      status: isOnline ? dev.status : 'OFFLINE'
+    };
+  });
+
+  return res.json({
+    success: true,
+    totalDevices: allDevices.length,
+    devices: allDevices
   });
 });
 

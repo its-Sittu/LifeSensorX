@@ -9,6 +9,7 @@ import LocationPermissionModal from './components/LocationPermissionModal';
 import { ShieldAlert, MapPin, Building2 } from 'lucide-react';
 import { useLocation } from './hooks/useLocation';
 import { useEmergencyStore } from './store/useEmergencyStore';
+import { useHospitalSocket } from './hooks/useHospitalSocket';
 import { getBackendUrl } from './utils/api';
 
 // Admin Components
@@ -63,6 +64,25 @@ const App: React.FC = () => {
 const EmergencyView: React.FC = () => {
   const { status, location, errorMsg, startTracking } = useLocation();
   const setEmergencyLocation = useEmergencyStore(state => state.setLocation);
+  const triggerEmergency = useEmergencyStore(state => state.triggerEmergency);
+  const { socket } = useHospitalSocket();
+
+  // Listen for ESP32 hardware crash events via Socket.io
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleHardwareCrash = (data: any) => {
+      console.log('[Frontend] crashDetected received:', data);
+      // Trigger the existing emergency modal, 10s countdown alarm & workflow
+      triggerEmergency();
+    };
+
+    socket.on('crashDetected', handleHardwareCrash);
+
+    return () => {
+      socket.off('crashDetected', handleHardwareCrash);
+    };
+  }, [socket, triggerEmergency]);
 
   useEffect(() => {
     if (location.latitude && location.longitude) {
