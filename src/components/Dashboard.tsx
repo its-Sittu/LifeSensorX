@@ -23,6 +23,10 @@ const Dashboard: React.FC = () => {
   const [iotDevice, setIotDevice] = useState<DeviceData | null>(null);
 
   useEffect(() => {
+    unlockAudio();
+  }, []);
+
+  useEffect(() => {
     if (!socket) return;
 
     const handleInitial = (devices: DeviceData[]) => {

@@ -1,13 +1,14 @@
-// Ultra-Reliable Instant Sound System with Embedded Base64 Siren, Web Audio Engine & Mobile Vibration
+// Ultra-Reliable Universal Audio Alarm with Embedded Base64 Siren, True iOS/Android Autoplay Unlock & Web Audio Pulse Engine
 import { EMERGENCY_SIREN_DATA_URI } from './sirenBase64';
 
 let audioCtx: AudioContext | null = null;
 let sirenAudioElement: HTMLAudioElement | null = null;
 let isAlarmPlaying = false;
 let pulseInterval: any = null;
+let isAudioHardwareUnlocked = false;
 
 // Initialize the embedded HTML5 Audio Element immediately
-const getAudioElement = (): HTMLAudioElement => {
+export const getAudioElement = (): HTMLAudioElement => {
   if (!sirenAudioElement && typeof Audio !== 'undefined') {
     sirenAudioElement = new Audio(EMERGENCY_SIREN_DATA_URI);
     sirenAudioElement.loop = true;
@@ -18,7 +19,7 @@ const getAudioElement = (): HTMLAudioElement => {
 };
 
 // Initialize Web Audio Context
-const getAudioContext = (): AudioContext | null => {
+export const getAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined') return null;
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -33,31 +34,61 @@ const getAudioContext = (): AudioContext | null => {
   return audioCtx;
 };
 
-// Prime / unlock audio on any early user presence
+// Universal Mobile & Desktop Autoplay Unlocker
+// Crucial: Plays 1 silent sample on AudioContext AND primes HTMLAudioElement to satisfy iOS Safari & Chrome
 export const unlockAudio = () => {
   try {
     const ctx = getAudioContext();
-    if (ctx && ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+    if (ctx) {
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      // Play 1-sample silent buffer on Web Audio to unlock hardware
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
     }
 
+    // Prime HTML5 Audio element so future async play() is never blocked
     const audio = getAudioElement();
     if (audio) {
-      audio.load();
+      audio.volume = 1.0;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            if (!isAlarmPlaying) {
+              audio.pause();
+              audio.currentTime = 0;
+            }
+            isAudioHardwareUnlocked = true;
+            console.log('[Audio] HTML5 Audio & WebAudio unlocked permanently');
+          })
+          .catch(() => {
+            // Still waiting for user interaction
+          });
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[Audio] Unlock error:', e);
+  }
 };
 
-// Auto-prime on any window interaction (passive, zero impact)
+// Automatically listen to ALL possible user touch/click/scroll events to auto-unlock on first arrival
 if (typeof window !== 'undefined') {
-  const primeEvents = ['touchstart', 'touchend', 'mousedown', 'keydown', 'click', 'pointerdown', 'mousemove', 'scroll'];
+  const unlockEvents = ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'keydown', 'click', 'scroll'];
   const handleInteraction = () => {
     unlockAudio();
+    if (isAudioHardwareUnlocked) {
+      unlockEvents.forEach(evt => window.removeEventListener(evt, handleInteraction));
+    }
   };
-  primeEvents.forEach(evt => window.addEventListener(evt, handleInteraction, { passive: true }));
+  unlockEvents.forEach(evt => window.addEventListener(evt, handleInteraction, { passive: true }));
 }
 
-// Play a piercing emergency beep pulse via Web Audio
+// Play a high-volume emergency beep pulse via Web Audio
 const playWebAudioBeep = (highTone: boolean) => {
   try {
     const ctx = getAudioContext();
@@ -74,24 +105,23 @@ const playWebAudioBeep = (highTone: boolean) => {
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(highTone ? 980 : 720, now);
 
-    gain.gain.setValueAtTime(0.85, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.32);
+    gain.gain.setValueAtTime(0.9, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.33);
 
     osc.connect(gain);
     gain.connect(ctx.destination);
 
     osc.start(now);
-    osc.stop(now + 0.33);
+    osc.stop(now + 0.34);
   } catch (err) {}
 };
 
 // Start Emergency Siren Directly
 export const startEmergencyAlarm = () => {
-  if (isAlarmPlaying) return;
-  isAlarmPlaying = true;
   console.log('🚨 [AudioAlarm] STARTING INSTANT EMERGENCY SIREN!');
+  isAlarmPlaying = true;
 
-  // 1. Channel 1: Embedded Base64 Siren Audio (Zero Network Dependency)
+  // 1. Channel 1: Embedded Base64 Siren Audio
   try {
     const audio = getAudioElement();
     if (audio) {
@@ -100,7 +130,7 @@ export const startEmergencyAlarm = () => {
       const promise = audio.play();
       if (promise !== undefined) {
         promise.catch(e => {
-          console.log('[AudioAlarm] HTML5 Audio autoplay policy deferred, WebAudio pulse active:', e.message);
+          console.log('[AudioAlarm] HTML5 Audio deferred to WebAudio:', e.message);
         });
       }
     }
