@@ -10,6 +10,7 @@ import { ShieldAlert, MapPin, Building2 } from 'lucide-react';
 import { useLocation } from './hooks/useLocation';
 import { useEmergencyStore } from './store/useEmergencyStore';
 import { useHospitalSocket } from './hooks/useHospitalSocket';
+import { unlockAudio, startEmergencyAlarm } from './utils/audioAlarm';
 import { getBackendUrl } from './utils/api';
 
 // Admin Components
@@ -73,7 +74,9 @@ const EmergencyView: React.FC = () => {
 
     const handleHardwareCrash = (data: any) => {
       console.log('[Socket.io] crashDetected received:', data);
-      // Trigger the existing emergency modal, 10s countdown alarm & workflow
+      // Unlock audio, start siren immediately, and open modal
+      unlockAudio();
+      startEmergencyAlarm();
       triggerEmergency();
     };
 
