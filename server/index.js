@@ -391,25 +391,6 @@ app.post('/send-alert', async (req, res) => {
 });
 
 /**
- * API Endpoint: /nearby-hospitals
- * Purpose: Proxies request to Google Places API / OpenStreetMap and enriches with explainable AI recommendation scoring
- */
-app.get('/nearby-hospitals', async (req, res) => {
-  const { lat, lng, query } = req.query;
-
-  const userLat = lat ? parseFloat(lat) : null;
-  const userLng = lng ? parseFloat(lng) : null;
-
-  if (query) {
-    console.log(`[DEBUG] Fetching hospitals by query: ${query}`);
-  } else {
-    console.log(`[DEBUG] Fetching hospitals with phone numbers for: ${lat}, ${lng}`);
-    if (userLat === null || userLng === null || isNaN(userLat) || isNaN(userLng)) {
-      return res.status(400).json({ success: false, error: "Valid latitude and longitude or search query required" });
-    }
-  }
-
-/**
  * Reusable Live Real Hospital Discovery Engine (100% Real Live Geo-Location Data)
  */
 async function fetchLiveRealHospitals(userLat, userLng, query = null) {
