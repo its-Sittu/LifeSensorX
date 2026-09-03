@@ -1,36 +1,63 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-
 import { getBackendUrl } from '../utils/api';
 
-const SOCKET_URL = getBackendUrl() || (typeof window !== 'undefined' ? window.location.origin : '');
+const getSocketUrl = (): string => {
+  const backendUrl = getBackendUrl();
+  if (backendUrl) return backendUrl;
+  return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000';
+};
 
-// Global socket instance so we don't open multiple connections on navigation
+// Global socket instance singleton
 let globalSocket: Socket | null = null;
 
+export const getSocket = (): Socket => {
+  if (!globalSocket) {
+    const socketUrl = getSocketUrl();
+    console.log(`[Socket.io] Initializing connection to: ${socketUrl}`);
+    
+    globalSocket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      timeout: 20000
+    });
+
+    globalSocket.on('connect', () => {
+      console.log(`[Socket.io] Connected`);
+    });
+
+    globalSocket.on('connect_error', (err) => {
+      console.warn(`[Socket.io] Connection Error:`, err.message);
+    });
+
+    globalSocket.on('disconnect', (reason) => {
+      console.log(`[Socket.io] Disconnected:`, reason);
+    });
+  }
+  return globalSocket;
+};
+
 export const useHospitalSocket = () => {
-  const [socket, setSocket] = useState<Socket | null>(globalSocket);
-  const [connected, setConnected] = useState(globalSocket ? globalSocket.connected : false);
+  const [socket, setSocket] = useState<Socket>(getSocket);
+  const [connected, setConnected] = useState<boolean>(() => getSocket().connected);
 
   useEffect(() => {
-    if (!globalSocket) {
-      globalSocket = io(SOCKET_URL);
-    }
+    const sock = getSocket();
+    setSocket(sock);
+    setConnected(sock.connected);
 
     const onConnect = () => setConnected(true);
     const onDisconnect = () => setConnected(false);
 
-    globalSocket.on('connect', onConnect);
-    globalSocket.on('disconnect', onDisconnect);
-
-    setSocket(globalSocket);
-    setConnected(globalSocket.connected);
+    sock.on('connect', onConnect);
+    sock.on('disconnect', onDisconnect);
 
     return () => {
-      if (globalSocket) {
-        globalSocket.off('connect', onConnect);
-        globalSocket.off('disconnect', onDisconnect);
-      }
+      sock.off('connect', onConnect);
+      sock.off('disconnect', onDisconnect);
     };
   }, []);
 

@@ -72,7 +72,7 @@ const EmergencyView: React.FC = () => {
     if (!socket) return;
 
     const handleHardwareCrash = (data: any) => {
-      console.log('[Frontend] crashDetected received:', data);
+      console.log('[Socket.io] crashDetected received:', data);
       // Trigger the existing emergency modal, 10s countdown alarm & workflow
       triggerEmergency();
     };

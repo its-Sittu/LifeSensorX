@@ -193,8 +193,8 @@ app.post('/api/device/crash', (req, res) => {
       };
 
       // Broadcast crash event to React frontend over Socket.io
+      console.log(`[Socket.io] Emitting crashDetected:`, crashPayload);
       io.emit('crashDetected', crashPayload);
-      console.log(`[Socket.io] crashDetected emitted:`, crashPayload);
 
       // Also update device status
       io.emit('deviceStatusUpdate', {

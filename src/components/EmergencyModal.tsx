@@ -8,6 +8,8 @@ import CountdownTimer from './CountdownTimer';
 import AlertPopup from './AlertPopup';
 import HospitalList from './HospitalList';
 
+import { startEmergencyAlarm, stopEmergencyAlarm } from '../utils/audioAlarm';
+
 const COUNTDOWN_TIME = 10;
 
 const EmergencyModal: React.FC = () => {
@@ -18,16 +20,9 @@ const EmergencyModal: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   
   const { isEmergencyMode, showEmergencyModal, cancelEmergency, closeEmergencyModal, contacts, location, hospitals, setHospitals, setLocation } = useEmergencyStore();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const stopAlerts = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    if ('vibrate' in navigator) {
-      navigator.vibrate(0);
-    }
+    stopEmergencyAlarm();
   }, []);
 
   useEffect(() => {
@@ -36,28 +31,8 @@ const EmergencyModal: React.FC = () => {
       setShowSelection(false);
       setIsDispatched(false);
       
-      // Play loud alarm
-      try {
-        if (!audioRef.current) {
-          audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3');
-          audioRef.current.loop = true;
-        } else {
-          audioRef.current.src = 'https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3';
-        }
-        
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.log('Audio autoplay prevented.', error);
-          });
-        }
-        
-        if ('vibrate' in navigator) {
-          navigator.vibrate([500, 500, 500, 500, 500, 500]);
-        }
-      } catch (err) {
-        console.error('Audio/Vibration error:', err);
-      }
+      // Play loud alarm with guaranteed audio & vibration
+      startEmergencyAlarm();
     } else {
       stopAlerts();
     }

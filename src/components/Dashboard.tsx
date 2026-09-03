@@ -4,6 +4,7 @@ import { ShieldAlert, Activity, Cpu } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useCrashDetection } from '../hooks/useCrashDetection';
 import { useHospitalSocket } from '../hooks/useHospitalSocket';
+import { unlockAudio } from '../utils/audioAlarm';
 
 interface DeviceData {
   deviceId: string;
@@ -72,7 +73,10 @@ const Dashboard: React.FC = () => {
 
           <div className="flex items-center justify-between">
             <button 
-              onClick={() => setIsActive(!isActive)}
+              onClick={() => {
+                unlockAudio();
+                setIsActive(!isActive);
+              }}
               className={`px-6 py-2.5 rounded-full font-medium transition-all ${
                 isActive 
                   ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' 
@@ -83,7 +87,10 @@ const Dashboard: React.FC = () => {
             </button>
             
             <button 
-              onClick={triggerEmergency}
+              onClick={() => {
+                unlockAudio();
+                triggerEmergency();
+              }}
               className="px-6 py-2.5 bg-red-500/20 text-red-400 rounded-full font-medium hover:bg-red-500/30 transition-all border border-red-500/30"
             >
               Test Emergency
