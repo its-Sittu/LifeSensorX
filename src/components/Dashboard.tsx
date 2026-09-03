@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useEmergencyStore } from '../store/useEmergencyStore';
-import { ShieldAlert, Cpu, Radio, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, Cpu, Radio, ShieldCheck, Volume2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useHospitalSocket } from '../hooks/useHospitalSocket';
-import { unlockAudio } from '../utils/audioAlarm';
+import { unlockAudio, armAudio } from '../utils/audioAlarm';
 
 interface DeviceData {
   deviceId: string;
@@ -78,21 +78,32 @@ const Dashboard: React.FC = () => {
             Directly linked to ESP32 + MPU6500 hardware. Alarms trigger automatically upon impact.
           </p>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900/60 px-3 py-1.5 rounded-full border border-zinc-800">
               <Radio size={14} className={isIotOnline ? "text-emerald-400 animate-pulse" : "text-cyan-400"} />
               <span>{isIotOnline ? `Device: ${iotDevice?.deviceId}` : 'Awaiting ESP32 Crash Signal'}</span>
             </div>
             
-            <button 
-              onClick={() => {
-                unlockAudio();
-                triggerEmergency();
-              }}
-              className="px-6 py-2.5 bg-red-500/20 text-red-400 rounded-full font-medium hover:bg-red-500/30 transition-all border border-red-500/30"
-            >
-              Test Emergency
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => {
+                  armAudio();
+                }}
+                className="px-4 py-2 bg-emerald-500/20 text-emerald-300 rounded-full font-medium hover:bg-emerald-500/30 transition-all border border-emerald-500/40 text-xs flex items-center gap-1.5 active:scale-95 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+              >
+                <Volume2 size={14} />
+                Arm Siren Audio
+              </button>
+              <button 
+                onClick={() => {
+                  armAudio();
+                  triggerEmergency();
+                }}
+                className="px-4 py-2 bg-red-500/20 text-red-400 rounded-full font-medium hover:bg-red-500/30 transition-all border border-red-500/30 text-xs active:scale-95"
+              >
+                Test Emergency
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>
