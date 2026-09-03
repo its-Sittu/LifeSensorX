@@ -86,31 +86,37 @@ export const useLocation = () => {
     };
   }, []);
 
-  // Check for existing permissions on mount
+  // Check for existing permissions and auto-start GPS tracking on mount
   useEffect(() => {
-    if ('permissions' in navigator) {
-      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((result) => {
-        if (result.state === 'granted') {
-          startTracking();
-        }
-        result.onchange = () => {
-          if (result.state === 'granted') {
-            startTracking();
-          } else if (result.state === 'denied') {
-            setStatus('denied');
-          }
-        };
-      });
-    }
-    
-    // Load last known location from cache immediately
+    // Load last known location from cache immediately for instant render
     const saved = localStorage.getItem('last_known_location');
     if (saved) {
       try {
-        setLocation(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.latitude && parsed.longitude) {
+          setLocation(parsed);
+          setStatus('active');
+        }
       } catch (e) {
         console.error('Failed to parse cached location');
       }
+    }
+
+    // Proactively start high-accuracy GPS tracking
+    startTracking();
+
+    if ('permissions' in navigator) {
+      try {
+        navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((result) => {
+          result.onchange = () => {
+            if (result.state === 'granted') {
+              startTracking();
+            } else if (result.state === 'denied') {
+              setStatus('denied');
+            }
+          };
+        }).catch(() => {});
+      } catch (e) {}
     }
   }, [startTracking]);
 
