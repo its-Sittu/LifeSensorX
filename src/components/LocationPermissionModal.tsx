@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { MapPin, ShieldAlert, Loader2, RefreshCw, AlertCircle, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LocationStatus } from '../hooks/useLocation';
+import { unlockAudio } from '../utils/audioAlarm';
 
 interface Props {
   status: LocationStatus;
@@ -61,7 +62,10 @@ const LocationPermissionModal: React.FC<Props> = ({ status, errorMsg, onAllow })
 
             <div className="flex flex-col w-full gap-3">
               <button 
-                onClick={onAllow}
+                onClick={() => {
+                  unlockAudio();
+                  onAllow();
+                }}
                 disabled={status === 'loading'}
                 className={`w-full py-3.5 rounded-xl text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 ${
                   status === 'denied' || status === 'unavailable' || status === 'error'
@@ -87,7 +91,10 @@ const LocationPermissionModal: React.FC<Props> = ({ status, errorMsg, onAllow })
               {/* Bypass button for manual search */}
               {(status === 'denied' || status === 'unavailable' || status === 'error' || status === 'idle') && (
                 <button 
-                  onClick={() => setIsDismissed(true)}
+                  onClick={() => {
+                    unlockAudio();
+                    setIsDismissed(true);
+                  }}
                   className="w-full py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 hover:border-zinc-700 mt-1"
                 >
                   <Search size={14} />
