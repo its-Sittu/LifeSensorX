@@ -403,17 +403,80 @@ function calculateHaversineKm(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Reusable Live Real Hospital Discovery Engine (Strict 10 KM Radius from User Location)
+ * Reusable Live Real Hospital Discovery Engine (Google Places API + Overpass 10 KM Radius)
  */
 async function fetchLiveRealHospitals(userLat, userLng, query = null) {
   let rawHospitals = [];
   let source = 'mock';
+  const API_KEY = process.env.GOOGLE_MAPS_API_KEY || "AIzaSyBxEzpjwRJ6qsoaASj8nKT3a2ilL3YrOkI";
 
-  // 1. Primary: Overpass API with Exact 10,000 meters (10 KM) Radius Circle
+  // 1. Primary: Official Google Places API (New) - Real Verified Phone Numbers, Exact Addresses & Ratings
   if (userLat !== null && userLng !== null) {
     try {
+      console.log(`[DEBUG] Querying Google Places Text Search (New) for hospitals near (${userLat}, ${userLng})...`);
+      const googleRes = await axios.post(
+        'https://places.googleapis.com/v1/places:searchText',
+        {
+          textQuery: query ? `hospitals in ${query}` : `emergency hospital`,
+          maxResultCount: 10,
+          locationBias: {
+            circle: {
+              center: { latitude: userLat, longitude: userLng },
+              radius: 10000.0
+            }
+          }
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': API_KEY,
+            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,places.nationalPhoneNumber,places.rating,places.googleMapsUri,places.userRatingCount'
+          },
+          timeout: 7000
+        }
+      );
+
+      if (googleRes.data && googleRes.data.places && googleRes.data.places.length > 0) {
+        const validList = [];
+        for (const place of googleRes.data.places) {
+          const hLat = place.location?.latitude;
+          const hLng = place.location?.longitude;
+          if (!hLat || !hLng) continue;
+
+          const dist = calculateHaversineKm(userLat, userLng, hLat, hLng);
+          if (dist > 10.0) continue; // STRICT 10 KM LIMIT
+
+          const phone = place.internationalPhoneNumber || place.nationalPhoneNumber || null;
+          const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${hLat},${hLng}&travelmode=driving`;
+
+          validList.push({
+            name: place.displayName?.text || 'Emergency Hospital',
+            address: place.formattedAddress || 'Nearby Healthcare Services',
+            location: { lat: hLat, lng: hLng },
+            phone,
+            rating: place.rating || 4.2,
+            userRatingsTotal: place.userRatingCount || 10,
+            directionsUrl,
+            distanceKm: parseFloat(dist.toFixed(2))
+          });
+        }
+
+        if (validList.length > 0) {
+          validList.sort((a, b) => a.distanceKm - b.distanceKm);
+          rawHospitals = validList;
+          source = 'google_places_new';
+        }
+      }
+    } catch (googleErr) {
+      console.log(`[DEBUG] Google Places API note (using Overpass fallback):`, googleErr.response?.data?.error?.message || googleErr.message);
+    }
+  }
+
+  // 2. Secondary: Overpass API with Exact 10,000 meters (10 KM) Radius Circle
+  if (rawHospitals.length === 0 && userLat !== null && userLng !== null) {
+    try {
       console.log(`[DEBUG] Querying Overpass for real hospitals within STRICT 10 KM of (${userLat}, ${userLng})...`);
-      const overpassQuery = `[out:json][timeout:12];
+      const overpassQuery = `[out:json][timeout:10];
 (
   nwr(around:10000,${userLat},${userLng})["amenity"="hospital"];
   nwr(around:10000,${userLat},${userLng})["healthcare"="hospital"];
@@ -424,9 +487,9 @@ out center tags;`;
 
       const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
       const response = await axios.get(overpassUrl, { 
-        timeout: 9000,
+        timeout: 8000,
         headers: {
-          'User-Agent': 'LifeSensorX-10KmEmergency/4.0'
+          'User-Agent': 'LifeSensorX-10KmEmergency/5.0'
         }
       });
 
@@ -481,7 +544,7 @@ out center tags;`;
     }
   }
 
-  // 2. Secondary: Nominatim Live Geocoding Search within 10KM Bounding Box
+  // 3. Fallback: Nominatim Live Geocoding Search within 10KM Bounding Box
   if (rawHospitals.length === 0) {
     try {
       console.log(`[DEBUG] Querying Nominatim for real hospitals...`);
@@ -496,9 +559,9 @@ out center tags;`;
 
       if (nominatimUrl) {
         const nomRes = await axios.get(nominatimUrl, {
-          timeout: 7000,
+          timeout: 6000,
           headers: {
-            'User-Agent': 'LifeSensorX-10KmEmergency/4.0'
+            'User-Agent': 'LifeSensorX-10KmEmergency/5.0'
           }
         });
 

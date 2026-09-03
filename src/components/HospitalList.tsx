@@ -199,30 +199,35 @@ const HospitalList: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <a 
-                      href={`tel:${hospital.phone ? hospital.phone.replace(/[\s\-()]/g, '') : '112'}`}
-                      className={`flex-1 py-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 px-2 ${
-                        hospital.phone
-                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                          : 'bg-zinc-800/80 border-zinc-700/60 text-zinc-300 hover:bg-zinc-700 hover:text-white'
-                      }`}
-                      title={hospital.phone ? `Direct Call: ${hospital.phone}` : 'Call 112 Emergency Helpline'}
-                    >
-                      <Phone size={13} className="shrink-0" />
-                      <span className="truncate">
-                        {hospital.phone ? 'Call Hospital' : 'Call 112 Helpline'}
-                      </span>
-                    </a>
+                  <div className="flex items-center gap-2 mt-1">
+                    {hospital.phone ? (
+                      <a 
+                        href={`tel:${hospital.phone.replace(/[\s\-()]/g, '')}`}
+                        className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition-all truncate px-3"
+                        title={`Call ${hospital.phone}`}
+                      >
+                        <Phone size={14} className="shrink-0 animate-bounce" />
+                        <span className="truncate font-semibold">Call {hospital.phone}</span>
+                      </a>
+                    ) : (
+                      <div 
+                        className="flex-1 py-2.5 rounded-xl bg-zinc-800/60 border border-zinc-700/40 text-zinc-500 text-xs font-medium flex items-center justify-center gap-1.5 px-3"
+                        title="Phone number unlisted on map"
+                      >
+                        <Phone size={14} className="shrink-0 opacity-40" />
+                        <span>Phone Unlisted</span>
+                      </div>
+                    )}
+
                     <button 
                       onClick={() => {
                         const origin = (location.latitude && location.longitude) ? `&origin=${location.latitude},${location.longitude}` : '';
                         window.open(`https://www.google.com/maps/dir/?api=1${origin}&destination=${hospital.location.lat},${hospital.location.lng}&travelmode=driving`, '_blank');
                       }}
-                      className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-500 transition-all active:scale-95 shadow-[0_0_10px_rgba(37,99,235,0.2)] px-2"
+                      className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.3)] transition-all px-3"
                     >
-                      <Navigation size={13} className="shrink-0" />
-                      <span>Navigate</span>
+                      <Navigation size={14} className="shrink-0" />
+                      <span>Directions</span>
                     </button>
                   </div>
                 </div>
