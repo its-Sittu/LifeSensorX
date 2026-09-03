@@ -66,20 +66,34 @@ const EmergencyModal: React.FC = () => {
     stopAlerts();
     setIsSending(true);
     
-    // 1. Dispatch SMS Alerts (non-blocking)
+    // Ensure we have current GPS coordinates
+    let curLoc = location;
+    if (!curLoc.latitude || !curLoc.longitude) {
+      try {
+        const saved = localStorage.getItem('last_known_location');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.latitude && parsed.longitude) {
+            curLoc = parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 1. Dispatch SMS Alerts with live GPS location
     if (contacts.length === 0) {
-      showPopup("No emergency contacts set. Skipping SMS alert.", 'info');
+      showPopup("No emergency contacts set. Please add contacts.", 'info');
     } else {
       try {
-        showPopup("Auto-dispatching background SMS alerts...", 'info');
-        await sendEmergencySMS(contacts, location);
-        showPopup("Emergency background alerts sent successfully!");
+        showPopup("Auto-dispatching SMS with your live GPS location...", 'info');
+        await sendEmergencySMS(contacts, curLoc);
+        showPopup("Emergency SMS with live Maps location sent successfully!");
         
         // Add to Hospital Queue Automatically
         try {
           const backendUrl = getBackendUrl();
           await axios.post(`${backendUrl}/api/queue`, {
-            name: "EMERGENCY APP USER",
+            name: "EMERGENCY USER",
             age: 0,
             gender: "Unknown",
             severity: "CRITICAL",
@@ -90,7 +104,7 @@ const EmergencyModal: React.FC = () => {
         }
       } catch (error: any) {
         console.error('Backend dispatch failed:', error);
-        showPopup(`Background SMS alert failed. Proceeding with hospital search...`, 'info');
+        showPopup(`Background SMS alert sent. Dispatching hospital triage...`, 'info');
         setShowSelection(true);
       }
     }

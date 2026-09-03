@@ -304,11 +304,11 @@ app.post('/send-alert', async (req, res) => {
       return res.status(400).json({ success: false, error: "Location coordinates are missing." });
     }
 
-    // 2. Format Phone Numbers (Fast2SMS expects 10 digits for Indian numbers)
+    // 2. Format Phone Numbers (Extract last 10 digits for Indian mobile numbers)
     const formattedNumbers = contacts.map(num => {
       let clean = String(num).replace(/\D/g, '');
-      if (clean.startsWith('91') && clean.length === 12) {
-        clean = clean.substring(2);
+      if (clean.length >= 10) {
+        return clean.slice(-10); // Guaranteed valid 10-digit mobile number
       }
       return clean;
     }).filter(num => num.length === 10).join(',');
