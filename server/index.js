@@ -512,33 +512,100 @@ app.get('/nearby-hospitals', async (req, res) => {
     }
   }
 
-  // 2. Fallback to OpenStreetMap (Overpass API)
+  // 2. Comprehensive OpenStreetMap Real Hospital Discovery (Overpass API - nodes, ways & relations)
   if (rawHospitals.length === 0 && userLat !== null && userLng !== null) {
     try {
-      console.log(`[DEBUG] Falling back to OpenStreetMap Overpass API...`);
-      const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:10000,${userLat},${userLng})["amenity"="hospital"];out;`;
+      console.log(`[DEBUG] Querying OpenStreetMap Overpass for REAL hospitals near ${userLat}, ${userLng}...`);
+      const overpassQuery = `[out:json][timeout:12];
+(
+  nwr(around:20000,${userLat},${userLng})["amenity"="hospital"];
+  nwr(around:20000,${userLat},${userLng})["healthcare"="hospital"];
+  nwr(around:15000,${userLat},${userLng})["emergency"="yes"];
+  nwr(around:10000,${userLat},${userLng})["amenity"="clinic"];
+);
+out center 15;`;
+
+      const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
       const response = await axios.get(overpassUrl, { 
-        timeout: 8000,
+        timeout: 9000,
         headers: {
-          'User-Agent': 'LifeSensorX-Emergency-App/1.0'
+          'User-Agent': 'LifeSensorX-RealHospitalDiscovery/2.0'
         }
       });
 
       if (response.data && response.data.elements && response.data.elements.length > 0) {
-        rawHospitals = response.data.elements.map(place => ({
-          name: place.tags.name || "Nearby Medical Center",
-          address: place.tags["addr:full"] || place.tags["addr:street"] || "Emergency Services",
-          location: { lat: place.lat, lng: place.lon },
-          phone: place.tags.phone || place.tags["contact:phone"] || null
-        })).slice(0, 5);
-        source = 'openstreetmap';
+        // Filter out elements without recognizable names and deduplicate
+        const seenNames = new Set();
+        const validElements = response.data.elements.filter(el => {
+          const name = el.tags?.name || el.tags?.['name:en'] || el.tags?.['official_name'];
+          if (!name || seenNames.has(name.toLowerCase())) return false;
+          seenNames.add(name.toLowerCase());
+          return true;
+        });
+
+        if (validElements.length > 0) {
+          rawHospitals = validElements.slice(0, 10).map(place => {
+            const hLat = place.lat || place.center?.lat;
+            const hLng = place.lon || place.center?.lon;
+            const street = place.tags?.['addr:street'] || place.tags?.['addr:suburb'] || place.tags?.['addr:district'] || '';
+            const city = place.tags?.['addr:city'] || place.tags?.['addr:state'] || '';
+            const fullAddr = place.tags?.['addr:full'] || [street, city].filter(Boolean).join(', ') || 'Emergency Trauma & Care Center';
+
+            return {
+              name: place.tags.name || place.tags['name:en'] || "Government Medical Center",
+              address: fullAddr,
+              location: { lat: hLat, lng: hLng },
+              phone: place.tags.phone || place.tags["contact:phone"] || place.tags["emergency:phone"] || "+91-112"
+            };
+          });
+          source = 'openstreetmap_overpass';
+        }
       }
     } catch (err) {
-      console.error(`[ERROR] OSM API Failed:`, err.message);
+      console.log(`[DEBUG] OSM Overpass API error:`, err.message);
     }
   }
 
-  // 3. Fallback: Local Database Hospitals & Mock Data
+  // 3. Fallback: OpenStreetMap Nominatim Live Search (100% Free, Global, Real Data)
+  if (rawHospitals.length === 0) {
+    try {
+      console.log(`[DEBUG] Querying OpenStreetMap Nominatim for real hospitals...`);
+      let nominatimUrl = '';
+      if (userLat !== null && userLng !== null) {
+        const delta = 0.25; // ~25km bounding box
+        const viewbox = `${userLng - delta},${userLat + delta},${userLng + delta},${userLat - delta}`;
+        nominatimUrl = `https://nominatim.openstreetmap.org/search?q=hospital&format=json&viewbox=${viewbox}&bounded=1&limit=10&addressdetails=1`;
+      } else if (query) {
+        nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ' hospital')}&format=json&limit=10&addressdetails=1`;
+      }
+
+      if (nominatimUrl) {
+        const nomRes = await axios.get(nominatimUrl, {
+          timeout: 8000,
+          headers: {
+            'User-Agent': 'LifeSensorX-RealHospitalDiscovery/2.0'
+          }
+        });
+
+        if (nomRes.data && nomRes.data.length > 0) {
+          rawHospitals = nomRes.data.map(item => ({
+            name: item.name || item.display_name.split(',')[0] || "Hospital",
+            address: item.display_name,
+            location: {
+              lat: parseFloat(item.lat),
+              lng: parseFloat(item.lon)
+            },
+            phone: "+91-112"
+          })).slice(0, 8);
+          source = 'openstreetmap_nominatim';
+        }
+      }
+    } catch (nomErr) {
+      console.log(`[DEBUG] Nominatim API error:`, nomErr.message);
+    }
+  }
+
+  // 4. Fallback: Local Registered Hospitals
   if (rawHospitals.length === 0) {
     source = 'in_memory_db';
     rawHospitals = hospitals.map(h => ({
