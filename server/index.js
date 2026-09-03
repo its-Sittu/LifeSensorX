@@ -390,107 +390,147 @@ app.post('/send-alert', async (req, res) => {
   }
 });
 
+function calculateHaversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 /**
- * Reusable Live Real Hospital Discovery Engine (100% Real Live Geo-Location Data)
+ * Reusable Live Real Hospital Discovery Engine (Strict 10 KM Radius from User Location)
  */
 async function fetchLiveRealHospitals(userLat, userLng, query = null) {
   let rawHospitals = [];
   let source = 'mock';
 
-  // 1. Primary: OpenStreetMap Nominatim Live Geocoding Search (100% Real, Global, Instant)
-  try {
-    let nominatimUrl = '';
-    if (userLat !== null && userLng !== null) {
-      const delta = 0.25; // ~25km bounding box
-      const viewbox = `${userLng - delta},${userLat + delta},${userLng + delta},${userLat - delta}`;
-      nominatimUrl = `https://nominatim.openstreetmap.org/search?q=hospital&format=json&viewbox=${viewbox}&bounded=1&limit=15&addressdetails=1`;
-    } else if (query) {
-      nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ' hospital')}&format=json&limit=15&addressdetails=1`;
-    }
-
-    if (nominatimUrl) {
-      const nomRes = await axios.get(nominatimUrl, {
-        timeout: 7000,
-        headers: {
-          'User-Agent': 'LifeSensorX-RealHospitalDiscovery/3.0'
-        }
-      });
-
-      if (nomRes.data && nomRes.data.length > 0) {
-        const seen = new Set();
-        const validItems = nomRes.data.filter(item => {
-          const rawName = item.name || item.display_name.split(',')[0];
-          if (!rawName || rawName.toLowerCase() === 'hospital' || seen.has(rawName.toLowerCase())) return false;
-          seen.add(rawName.toLowerCase());
-          return true;
-        });
-
-        if (validItems.length > 0) {
-          rawHospitals = validItems.slice(0, 10).map(item => ({
-            name: item.name || item.display_name.split(',')[0],
-            address: item.display_name,
-            location: {
-              lat: parseFloat(item.lat),
-              lng: parseFloat(item.lon)
-            },
-            phone: "+91-112"
-          }));
-          source = 'openstreetmap_nominatim';
-        }
-      }
-    }
-  } catch (nomErr) {
-    console.log(`[DEBUG] Nominatim API note:`, nomErr.message);
-  }
-
-  // 2. Secondary: Comprehensive OpenStreetMap Overpass (NWR)
-  if (rawHospitals.length === 0 && userLat !== null && userLng !== null) {
+  // 1. Primary: Overpass API with Exact 10,000 meters (10 KM) Radius Circle
+  if (userLat !== null && userLng !== null) {
     try {
-      const overpassQuery = `[out:json][timeout:10];
+      console.log(`[DEBUG] Querying Overpass for real hospitals within STRICT 10 KM of (${userLat}, ${userLng})...`);
+      const overpassQuery = `[out:json][timeout:12];
 (
-  nwr(around:25000,${userLat},${userLng})["amenity"="hospital"];
-  nwr(around:25000,${userLat},${userLng})["healthcare"="hospital"];
-  nwr(around:15000,${userLat},${userLng})["emergency"="yes"];
+  nwr(around:10000,${userLat},${userLng})["amenity"="hospital"];
+  nwr(around:10000,${userLat},${userLng})["healthcare"="hospital"];
+  nwr(around:10000,${userLat},${userLng})["emergency"="yes"];
+  nwr(around:7000,${userLat},${userLng})["amenity"="clinic"];
 );
-out center 15;`;
+out center tags;`;
 
       const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
       const response = await axios.get(overpassUrl, { 
-        timeout: 8000,
+        timeout: 9000,
         headers: {
-          'User-Agent': 'LifeSensorX-RealHospitalDiscovery/3.0'
+          'User-Agent': 'LifeSensorX-10KmEmergency/4.0'
         }
       });
 
       if (response.data && response.data.elements && response.data.elements.length > 0) {
         const seenNames = new Set();
-        const validElements = response.data.elements.filter(el => {
-          const name = el.tags?.name || el.tags?.['name:en'] || el.tags?.['official_name'];
-          if (!name || seenNames.has(name.toLowerCase())) return false;
+        const validList = [];
+
+        for (const place of response.data.elements) {
+          const name = place.tags?.name || place.tags?.['name:en'] || place.tags?.['official_name'];
+          if (!name || seenNames.has(name.toLowerCase())) continue;
           seenNames.add(name.toLowerCase());
-          return true;
-        });
 
-        if (validElements.length > 0) {
-          rawHospitals = validElements.slice(0, 10).map(place => {
-            const hLat = place.lat || place.center?.lat;
-            const hLng = place.lon || place.center?.lon;
-            const street = place.tags?.['addr:street'] || place.tags?.['addr:suburb'] || place.tags?.['addr:district'] || '';
-            const city = place.tags?.['addr:city'] || place.tags?.['addr:state'] || '';
-            const fullAddr = place.tags?.['addr:full'] || [street, city].filter(Boolean).join(', ') || 'Emergency Trauma & Care Center';
+          const hLat = place.lat || place.center?.lat;
+          const hLng = place.lon || place.center?.lon;
+          if (!hLat || !hLng) continue;
 
-            return {
-              name: place.tags.name || place.tags['name:en'] || "Government Medical Center",
-              address: fullAddr,
-              location: { lat: hLat, lng: hLng },
-              phone: place.tags.phone || place.tags["contact:phone"] || place.tags["emergency:phone"] || "+91-112"
-            };
+          const dist = calculateHaversineKm(userLat, userLng, hLat, hLng);
+          if (dist > 10.0) continue; // STRICT 10 KM FILTER
+
+          const phone = place.tags?.phone || place.tags?.['contact:phone'] || place.tags?.['contact:mobile'] || place.tags?.['emergency:phone'] || '108';
+          const street = place.tags?.['addr:street'] || place.tags?.['addr:suburb'] || place.tags?.['addr:district'] || '';
+          const city = place.tags?.['addr:city'] || place.tags?.['addr:state'] || '';
+          const fullAddr = place.tags?.['addr:full'] || [street, city].filter(Boolean).join(', ') || 'Emergency Trauma Center';
+          const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${hLat},${hLng}&travelmode=driving`;
+
+          validList.push({
+            name,
+            address: fullAddr,
+            location: { lat: hLat, lng: hLng },
+            phone,
+            directionsUrl,
+            distanceKm: parseFloat(dist.toFixed(2))
           });
+        }
+
+        if (validList.length > 0) {
+          validList.sort((a, b) => a.distanceKm - b.distanceKm);
+          rawHospitals = validList.slice(0, 10);
           source = 'openstreetmap_overpass';
         }
       }
     } catch (err) {
-      console.log(`[DEBUG] OSM Overpass API note:`, err.message);
+      console.log(`[DEBUG] Overpass 10km error:`, err.message);
+    }
+  }
+
+  // 2. Secondary: Nominatim Live Geocoding Search within 10KM Bounding Box
+  if (rawHospitals.length === 0) {
+    try {
+      console.log(`[DEBUG] Querying Nominatim for real hospitals...`);
+      let nominatimUrl = '';
+      if (userLat !== null && userLng !== null) {
+        const delta = 0.09; // ~10km bounding box (0.09 deg ~ 10 km)
+        const viewbox = `${userLng - delta},${userLat + delta},${userLng + delta},${userLat - delta}`;
+        nominatimUrl = `https://nominatim.openstreetmap.org/search?q=hospital&format=json&viewbox=${viewbox}&bounded=1&limit=15&addressdetails=1`;
+      } else if (query) {
+        nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ' hospital')}&format=json&limit=15&addressdetails=1`;
+      }
+
+      if (nominatimUrl) {
+        const nomRes = await axios.get(nominatimUrl, {
+          timeout: 7000,
+          headers: {
+            'User-Agent': 'LifeSensorX-10KmEmergency/4.0'
+          }
+        });
+
+        if (nomRes.data && nomRes.data.length > 0) {
+          const seen = new Set();
+          const validItems = nomRes.data.filter(item => {
+            const rawName = item.name || item.display_name.split(',')[0];
+            if (!rawName || rawName.toLowerCase() === 'hospital' || seen.has(rawName.toLowerCase())) return false;
+            seen.add(rawName.toLowerCase());
+            return true;
+          });
+
+          if (validItems.length > 0) {
+            rawHospitals = validItems.map(item => {
+              const hLat = parseFloat(item.lat);
+              const hLng = parseFloat(item.lon);
+              const dist = (userLat !== null && userLng !== null) ? calculateHaversineKm(userLat, userLng, hLat, hLng) : 0;
+              const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${hLat},${hLng}&travelmode=driving`;
+
+              return {
+                name: item.name || item.display_name.split(',')[0],
+                address: item.display_name,
+                location: { lat: hLat, lng: hLng },
+                phone: "108",
+                directionsUrl,
+                distanceKm: parseFloat(dist.toFixed(2))
+              };
+            });
+
+            if (userLat !== null && userLng !== null) {
+              rawHospitals = rawHospitals.filter(h => h.distanceKm <= 10.0);
+              rawHospitals.sort((a, b) => a.distanceKm - b.distanceKm);
+            }
+            rawHospitals = rawHospitals.slice(0, 10);
+            source = 'openstreetmap_nominatim';
+          }
+        }
+      }
+    } catch (nomErr) {
+      console.log(`[DEBUG] Nominatim API error:`, nomErr.message);
     }
   }
 

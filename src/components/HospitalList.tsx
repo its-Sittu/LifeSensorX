@@ -193,18 +193,26 @@ const HospitalList: React.FC = () => {
 
                   <div className="flex items-center gap-2">
                     <a 
-                      href={`tel:${hospital.phone ? hospital.phone.replace(/\s+/g, '') : '112'}`}
-                      className="flex-1 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition-all active:scale-95"
+                      href={`tel:${hospital.phone ? hospital.phone.replace(/[\s\-()]/g, '') : '108'}`}
+                      className="flex-1 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-600 hover:text-white transition-all active:scale-95 truncate px-2"
+                      title={hospital.phone || 'Call 108 Emergency Ambulance'}
                     >
-                      <Phone size={14} />
-                      {hospital.phone && hospital.phone !== '+91-112' ? 'Call Hospital' : 'Call 112 (Ambulance)'}
+                      <Phone size={13} className="shrink-0" />
+                      <span className="truncate">
+                        {hospital.phone && hospital.phone !== '108' && hospital.phone !== '+91-112' 
+                          ? `Call (${hospital.phone})` 
+                          : 'Call 108 Ambulance'}
+                      </span>
                     </a>
                     <button 
-                      onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${hospital.location.lat},${hospital.location.lng}`, '_blank')}
-                      className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-blue-500 transition-all active:scale-95 shadow-[0_0_10px_rgba(37,99,235,0.2)]"
+                      onClick={() => {
+                        const origin = (location.latitude && location.longitude) ? `&origin=${location.latitude},${location.longitude}` : '';
+                        window.open(`https://www.google.com/maps/dir/?api=1${origin}&destination=${hospital.location.lat},${hospital.location.lng}&travelmode=driving`, '_blank');
+                      }}
+                      className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-500 transition-all active:scale-95 shadow-[0_0_10px_rgba(37,99,235,0.2)] px-2"
                     >
-                      <Navigation size={14} />
-                      Directions
+                      <Navigation size={13} className="shrink-0" />
+                      <span>Directions</span>
                     </button>
                   </div>
                 </div>
