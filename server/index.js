@@ -439,11 +439,14 @@ app.get('/api/voice/emergency-twiml', (req, res) => {
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="hi-IN">
-    इमरजेंसी अलर्ट! लाइफ सेंसर एक्स से आपातकालीन सूचना है। दुर्घटना डिटेक्ट हुई है। मरीज का लाइव जीपीएस लोकेशन लिंक एसएमएस द्वारा भेज दिया गया है। कृपया तुरंत सहायता भेजें।
+    सावधान! यह लाइफ सेंसर एक्स से एक आपातकालीन संदेश है।
+    मरीज का गंभीर एक्सीडेंट डिटेक्ट हुआ है।
+    मरीज की लाइव जीपीएस लोकेशन आपके मोबाइल नंबर पर एसएमएस द्वारा भेज दी गई है।
+    कृपया तुरंत मदद भेजें या नजदीकी अस्पताल से संपर्क करें।
   </Say>
-  <Pause length="1"/>
-  <Say voice="alice" language="en-US">
-    Emergency alert from Life Sensor X. A crash has been detected. Live GPS coordinates and medical details have been dispatched to your mobile. Please assist immediately.
+  <Pause length="2"/>
+  <Say voice="Polly.Aditi" language="hi-IN">
+    दोहराया जा रहा है: लाइफ सेंसर एक्स आपातकालीन अलर्ट! मरीज का एक्सीडेंट डिटेक्ट हुआ है। तुरंत लोकेशन एसएमएस में चेक करें और सहायता पहुंचाएं। धन्यवाद।
   </Say>
 </Response>`;
   res.send(twiml);
