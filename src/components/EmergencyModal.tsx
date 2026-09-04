@@ -234,10 +234,30 @@ const EmergencyModal: React.FC = () => {
               
               {!isDispatched && !showSelection ? (
                 <>
-                  <div className="w-20 h-20 mb-6 rounded-full bg-red-500 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.8)]">
-                    <AlertTriangle size={40} className="text-white" />
+                  {/* Top Emergency Header */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-[0_0_30px_rgba(239,68,68,0.9)] animate-pulse">
+                      <AlertTriangle size={28} className="text-white" />
+                    </div>
+                    <div className="text-left">
+                      <h1 className="text-2xl font-black text-white tracking-tight uppercase">Accident Detected!</h1>
+                      <p className="text-xs text-red-200">Loud siren active • Emergency countdown</p>
+                    </div>
                   </div>
-                  <h1 className="text-3xl font-bold text-white mb-2 tracking-tight uppercase">Emergency!</h1>
+
+                  {/* PROMINENT TOP 'I'M SAFE' BUTTON */}
+                  <div className="w-full mb-6">
+                    <button 
+                      onClick={handleSafe}
+                      className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white text-xl font-extrabold flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(16,185,129,0.6)] border-2 border-white/40 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <CheckCircle size={30} className="text-white" />
+                      <span>I'M SAFE — CANCEL ALERT</span>
+                    </button>
+                    <p className="text-xs text-emerald-200 mt-2 font-medium">
+                      👆 Tap here within <span className="font-bold text-white text-sm bg-red-950/80 px-2 py-0.5 rounded-md border border-red-500/50">{timeLeft}s</span> to stop call and sirens
+                    </p>
+                  </div>
 
                   {isAudioMuted && (
                     <button
@@ -247,30 +267,29 @@ const EmergencyModal: React.FC = () => {
                         startEmergencyAlarm();
                         setIsAudioMuted(false);
                       }}
-                      className="mb-3 px-4 py-2 bg-amber-500/30 border border-amber-400/60 text-amber-200 rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse hover:bg-amber-500/40"
+                      className="mb-4 px-4 py-2 bg-amber-500/30 border border-amber-400/60 text-amber-200 rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse hover:bg-amber-500/40"
                     >
                       <Volume2 size={16} />
                       Tap here to unmute loud siren
                     </button>
                   )}
 
-                  <CountdownTimer 
-                    timeLeft={timeLeft} 
-                    setTimeLeft={setTimeLeft} 
-                    onComplete={onCountdownComplete} 
-                    isActive={isEmergencyMode} 
-                  />
-                  <button 
-                    onClick={handleSafe}
-                    className="w-full py-4 rounded-2xl bg-white text-red-600 text-xl font-bold flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(255,255,255,0.3)] active:scale-95 transition-all mt-4"
-                  >
-                    <CheckCircle size={28} />
-                    I'M SAFE
-                  </button>
-                  <p className="mt-4 text-sm text-red-300 mb-8">Tap to cancel emergency alert</p>
-                  
+                  {/* Countdown Timer */}
+                  <div className="my-2 flex flex-col items-center">
+                    <CountdownTimer 
+                      timeLeft={timeLeft} 
+                      setTimeLeft={setTimeLeft} 
+                      onComplete={onCountdownComplete} 
+                      isActive={isEmergencyMode} 
+                    />
+                    <div className="mt-3 px-4 py-1.5 rounded-full bg-red-900/60 border border-red-500/40 text-red-200 text-xs flex items-center gap-2 font-medium">
+                      <Phone size={14} className="animate-bounce text-amber-300" />
+                      <span>Auto-dialing AI Voice Call & SMS in <b>{timeLeft} seconds</b></span>
+                    </div>
+                  </div>
+
                   {/* Nearby Hospitals Section during Countdown */}
-                  <div className="w-full text-left mt-4 border-t border-red-500/20 pt-8">
+                  <div className="w-full text-left mt-6 border-t border-red-500/20 pt-6">
                     <HospitalList />
                   </div>
                 </>
