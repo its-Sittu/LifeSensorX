@@ -61,6 +61,7 @@ const { scoreAndRankHospitals } = require('./utils/scoring');
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Request Logger
 app.use((req, res, next) => {
@@ -432,10 +433,10 @@ app.post('/send-alert', async (req, res) => {
 });
 
 /**
- * Dynamic TwiML Endpoint for Twilio Voice Calls
+ * Dynamic TwiML Endpoint for Twilio Voice Calls (Handles GET & POST)
  */
-app.get('/api/voice/emergency-twiml', (req, res) => {
-  res.type('text/xml');
+app.all('/api/voice/emergency-twiml', (req, res) => {
+  res.setHeader('Content-Type', 'text/xml; charset=utf-8');
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="hi-IN">
@@ -449,7 +450,7 @@ app.get('/api/voice/emergency-twiml', (req, res) => {
     दोहराया जा रहा है: लाइफ सेंसर एक्स आपातकालीन अलर्ट! मरीज का एक्सीडेंट डिटेक्ट हुआ है। तुरंत लोकेशन एसएमएस में चेक करें और सहायता पहुंचाएं। धन्यवाद।
   </Say>
 </Response>`;
-  res.send(twiml);
+  return res.status(200).send(twiml);
 });
 
 /**
