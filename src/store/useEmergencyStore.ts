@@ -57,9 +57,7 @@ export const useEmergencyStore = create<EmergencyState>()(
     (set) => ({
       isEmergencyMode: false,
       showEmergencyModal: false,
-      contacts: [
-        { id: '1', name: 'Emergency Monitor', phone: '+19897877228' }
-      ],
+      contacts: [],
       location: { latitude: null, longitude: null, error: null },
       hospitals: [],
 

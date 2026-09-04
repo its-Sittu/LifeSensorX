@@ -339,15 +339,13 @@ app.post('/send-alert', async (req, res) => {
         const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'https://lifesensorx.onrender.com';
         const twimlUrl = `${publicUrl}/api/voice/emergency-twiml?lat=${latitude}&lng=${longitude}`;
 
-        // Format all contact numbers to E.164 (+91XXXXXXXXXX)
+        // Format all contact numbers to E.164 (+91XXXXXXXXXX) - Guaranteed clean format
         const targetNumbers = contacts.map(c => {
-          const raw = String(c).trim();
-          if (raw.startsWith('+')) return raw;
-          const digits = raw.replace(/\D/g, '');
+          const digits = String(c).replace(/\D/g, '');
           return digits.length >= 10 ? `+91${digits.slice(-10)}` : null;
         }).filter(Boolean);
 
-        console.log(`[Twilio Voice] Emergency contacts to call:`, targetNumbers);
+        console.log(`[Twilio Voice] Emergency contacts to call (${targetNumbers.length}):`, targetNumbers);
 
         // Call each emergency contact
         for (const num of targetNumbers) {
