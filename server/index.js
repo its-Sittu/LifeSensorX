@@ -324,7 +324,44 @@ app.post('/send-alert', async (req, res) => {
     console.log(`[DEBUG] Final Numbers: ${formattedNumbers}`);
     console.log(`[DEBUG] Message: ${messageBody}`);
 
-    // 4. Fast2SMS API Call with Resilient Fallback
+    // 4. Twilio AI Voice Calling Integration
+    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
+
+    let callStatus = { attempted: false, success: false };
+
+    if (twilioSid && twilioToken && twilioNumber) {
+      try {
+        const twilio = require('twilio');
+        const twilioClient = twilio(twilioSid, twilioToken);
+
+        // Format contacts with E.164 (e.g. +91XXXXXXXXXX)
+        const primaryNumber = contacts[0] ? (contacts[0].startsWith('+') ? contacts[0] : `+91${contacts[0].replace(/\D/g, '').slice(-10)}`) : null;
+        
+        if (primaryNumber) {
+          console.log(`[Twilio Voice] Triggering emergency voice call to: ${primaryNumber}`);
+          
+          // Build Public TwiML Webhook URL or Fallback
+          const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'https://lifesensorx.onrender.com';
+          const twimlUrl = `${publicUrl}/api/voice/emergency-twiml?lat=${latitude}&lng=${longitude}`;
+
+          const call = await twilioClient.calls.create({
+            url: twimlUrl,
+            to: primaryNumber,
+            from: twilioNumber
+          });
+
+          console.log(`[Twilio Voice] Call successfully dispatched! SID: ${call.sid}`);
+          callStatus = { attempted: true, success: true, sid: call.sid, to: primaryNumber };
+        }
+      } catch (voiceErr) {
+        console.warn(`[Twilio Voice] Voice call dispatch note:`, voiceErr.message);
+        callStatus = { attempted: true, success: false, error: voiceErr.message };
+      }
+    }
+
+    // 5. Fast2SMS API Call with Resilient Fallback
     const apiKey = process.env.FAST2SMS_API_KEY;
     if (!apiKey || apiKey === 'your_fast2sms_api_key_here') {
       console.warn(`[WARN] FAST2SMS_API_KEY is not configured. Simulating SMS dispatch in development.`);
@@ -332,7 +369,8 @@ app.post('/send-alert', async (req, res) => {
         success: true,
         message: "Emergency alert simulated successfully (Demo mode)",
         request_id: "sim_" + Date.now(),
-        mapsLink
+        mapsLink,
+        callStatus
       });
     }
 
@@ -354,9 +392,10 @@ app.post('/send-alert', async (req, res) => {
       if (response.data && response.data.return === true) {
         return res.status(200).json({
           success: true,
-          message: "Emergency SMS sent successfully",
+          message: "Emergency SMS and Voice Call dispatched successfully",
           request_id: response.data.request_id,
-          mapsLink
+          mapsLink,
+          callStatus
         });
       } else {
         console.warn(`[WARN] Fast2SMS Response:`, response.data);
@@ -364,7 +403,8 @@ app.post('/send-alert', async (req, res) => {
           success: true,
           gateway: 'fallback',
           message: response.data?.message || "Emergency alert dispatched",
-          mapsLink
+          mapsLink,
+          callStatus
         });
       }
     } catch (apiError) {
@@ -375,7 +415,8 @@ app.post('/send-alert', async (req, res) => {
         gateway: 'fallback',
         message: `Alert processed. Live GPS maps link ready.`,
         detail: errorMsg,
-        mapsLink
+        mapsLink,
+        callStatus
       });
     }
 
@@ -386,6 +427,66 @@ app.post('/send-alert', async (req, res) => {
       success: false,
       error: "Failed to process emergency alert.",
       detail: errorDetail
+    });
+  }
+});
+
+/**
+ * Dynamic TwiML Endpoint for Twilio Voice Calls
+ */
+app.get('/api/voice/emergency-twiml', (req, res) => {
+  res.type('text/xml');
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Aditi" language="hi-IN">
+    इमरजेंसी अलर्ट! लाइफ सेंसर एक्स से आपातकालीन सूचना है। दुर्घटना डिटेक्ट हुई है। मरीज का लाइव जीपीएस लोकेशन लिंक एसएमएस द्वारा भेज दिया गया है। कृपया तुरंत सहायता भेजें।
+  </Say>
+  <Pause length="1"/>
+  <Say voice="alice" language="en-US">
+    Emergency alert from Life Sensor X. A crash has been detected. Live GPS coordinates and medical details have been dispatched to your mobile. Please assist immediately.
+  </Say>
+</Response>`;
+  res.send(twiml);
+});
+
+/**
+ * Dedicated Direct Call Trigger Endpoint
+ */
+app.post('/api/emergency/trigger-call', async (req, res) => {
+  try {
+    const { contactNumber, patientName, latitude, longitude } = req.body;
+    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
+
+    if (!twilioSid || !twilioToken || !twilioNumber) {
+      return res.status(500).json({ success: false, error: "Twilio credentials not configured in server." });
+    }
+
+    const targetNumber = contactNumber || '+918789812990';
+    const formattedTarget = targetNumber.startsWith('+') ? targetNumber : `+91${targetNumber.replace(/\D/g, '').slice(-10)}`;
+    const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'https://lifesensorx.onrender.com';
+    const twimlUrl = `${publicUrl}/api/voice/emergency-twiml?lat=${latitude || 0}&lng=${longitude || 0}`;
+
+    const twilio = require('twilio');
+    const twilioClient = twilio(twilioSid, twilioToken);
+
+    const call = await twilioClient.calls.create({
+      url: twimlUrl,
+      to: formattedTarget,
+      from: twilioNumber
+    });
+
+    return res.json({
+      success: true,
+      message: `Emergency AI call placed to ${formattedTarget}`,
+      callSid: call.sid
+    });
+  } catch (err) {
+    console.error("[Twilio Direct Call Error]:", err);
+    return res.status(500).json({
+      success: false,
+      error: err.message
     });
   }
 });
