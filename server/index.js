@@ -325,39 +325,51 @@ app.post('/send-alert', async (req, res) => {
     console.log(`[DEBUG] Final Numbers: ${formattedNumbers}`);
     console.log(`[DEBUG] Message: ${messageBody}`);
 
-    // 4. Twilio AI Voice Calling Integration
+    // 4. Twilio AI Voice Calling Integration (Calls ALL saved emergency contacts)
     const twilioSid = process.env.TWILIO_ACCOUNT_SID;
     const twilioToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
 
-    let callStatus = { attempted: false, success: false };
+    let callStatus = { attempted: false, success: false, calls: [] };
 
-    if (twilioSid && twilioToken && twilioNumber) {
+    if (twilioSid && twilioToken && twilioNumber && contacts.length > 0) {
       try {
         const twilio = require('twilio');
         const twilioClient = twilio(twilioSid, twilioToken);
+        const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'https://lifesensorx.onrender.com';
+        const twimlUrl = `${publicUrl}/api/voice/emergency-twiml?lat=${latitude}&lng=${longitude}`;
 
-        // Format contacts with E.164 (e.g. +91XXXXXXXXXX)
-        const primaryNumber = contacts[0] ? (contacts[0].startsWith('+') ? contacts[0] : `+91${contacts[0].replace(/\D/g, '').slice(-10)}`) : null;
-        
-        if (primaryNumber) {
-          console.log(`[Twilio Voice] Triggering emergency voice call to: ${primaryNumber}`);
-          
-          // Build Public TwiML Webhook URL or Fallback
-          const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'https://lifesensorx.onrender.com';
-          const twimlUrl = `${publicUrl}/api/voice/emergency-twiml?lat=${latitude}&lng=${longitude}`;
+        // Format all contact numbers to E.164 (+91XXXXXXXXXX)
+        const targetNumbers = contacts.map(c => {
+          const raw = String(c).trim();
+          if (raw.startsWith('+')) return raw;
+          const digits = raw.replace(/\D/g, '');
+          return digits.length >= 10 ? `+91${digits.slice(-10)}` : null;
+        }).filter(Boolean);
 
-          const call = await twilioClient.calls.create({
-            url: twimlUrl,
-            to: primaryNumber,
-            from: twilioNumber
-          });
+        console.log(`[Twilio Voice] Emergency contacts to call:`, targetNumbers);
 
-          console.log(`[Twilio Voice] Call successfully dispatched! SID: ${call.sid}`);
-          callStatus = { attempted: true, success: true, sid: call.sid, to: primaryNumber };
+        // Call each emergency contact
+        for (const num of targetNumbers) {
+          try {
+            console.log(`[Twilio Voice] Triggering call to: ${num}`);
+            const call = await twilioClient.calls.create({
+              url: twimlUrl,
+              to: num,
+              from: twilioNumber
+            });
+            console.log(`[Twilio Voice] Call placed to ${num}, SID: ${call.sid}`);
+            callStatus.calls.push({ number: num, success: true, sid: call.sid });
+          } catch (individualCallErr) {
+            console.warn(`[Twilio Voice] Failed to call ${num}:`, individualCallErr.message);
+            callStatus.calls.push({ number: num, success: false, error: individualCallErr.message });
+          }
         }
+
+        callStatus.attempted = true;
+        callStatus.success = callStatus.calls.some(c => c.success);
       } catch (voiceErr) {
-        console.warn(`[Twilio Voice] Voice call dispatch note:`, voiceErr.message);
+        console.warn(`[Twilio Voice] Voice batch error:`, voiceErr.message);
         callStatus = { attempted: true, success: false, error: voiceErr.message };
       }
     }
