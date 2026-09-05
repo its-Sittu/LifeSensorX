@@ -170,26 +170,28 @@ const EmergencyModal: React.FC = () => {
 
   const sendWhatsApp = async () => {
     if (contacts.length === 0) {
-      showPopup("No emergency contacts found.", 'info');
+      showPopup("No emergency contacts found. Please add contacts.", 'info');
       return;
     }
 
     const message = getEmergencyMessage();
 
+    // Universal WhatsApp Link (works on Mobile App, Web WhatsApp, Android, and iOS)
     if (contacts.length === 1) {
       const phone = contacts[0].phone.replace(/\D/g, '');
       const finalPhone = phone.length === 10 ? `91${phone}` : phone;
-      const link = `whatsapp://send?phone=${finalPhone}&text=${encodeURIComponent(message)}`;
-      window.open(link, '_blank');
-      showPopup("Opening emergency chat...");
-      cancelEmergency();
+      const webLink = `https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(message)}`;
+      window.open(webLink, '_blank');
+      showPopup("Opening WhatsApp with live GPS location...", 'success');
       return;
     }
 
-    const link = `whatsapp://send?text=${encodeURIComponent(message)}`;
-    window.open(link, '_blank');
-    showPopup("Select your contacts in WhatsApp.");
-    cancelEmergency();
+    // Multiple contacts: Open primary contact first and provide direct share intent
+    const firstPhone = contacts[0].phone.replace(/\D/g, '');
+    const finalFirstPhone = firstPhone.length === 10 ? `91${firstPhone}` : firstPhone;
+    const universalLink = `https://api.whatsapp.com/send?phone=${finalFirstPhone}&text=${encodeURIComponent(message)}`;
+    window.open(universalLink, '_blank');
+    showPopup(`Opening WhatsApp chat for ${contacts[0].name || contacts[0].phone}...`, 'success');
   };
 
   const sendSMS = () => {
@@ -198,8 +200,7 @@ const EmergencyModal: React.FC = () => {
       const allPhones = contacts.map(c => c.phone.replace(/\D/g, '')).join(',');
       const smsLink = `sms:${allPhones}?body=${encodeURIComponent(message)}`;
       window.open(smsLink, '_self');
-      showPopup("Emergency message ready for all contacts. Please confirm in SMS app.");
-      cancelEmergency();
+      showPopup("Emergency message ready in your phone SMS app.");
     } else {
       showPopup("No emergency contacts found.", 'info');
     }
@@ -358,13 +359,31 @@ const EmergencyModal: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="w-full flex gap-3 mt-4">
+                  {/* 1-Click Direct WhatsApp & SMS Sharing */}
+                  <div className="w-full flex flex-col gap-2 mt-3">
+                    <button 
+                      onClick={sendWhatsApp}
+                      className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(37,211,102,0.5)] active:scale-95 transition-all cursor-pointer"
+                    >
+                      <span className="text-lg">📲</span>
+                      <span>Send Live Location via WhatsApp (Free)</span>
+                    </button>
+                    <button 
+                      onClick={sendSMS}
+                      className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <span>💬</span>
+                      <span>Open Phone Native SMS</span>
+                    </button>
+                  </div>
+
+                  <div className="w-full flex gap-3 mt-2">
                     <button 
                       onClick={() => {
                         cancelEmergency();
                         closeEmergencyModal();
                       }}
-                      className="flex-1 py-3 rounded-xl bg-white text-red-600 font-bold text-sm shadow-[0_0_15px_rgba(255,255,255,0.2)] active:scale-95 transition-all"
+                      className="w-full py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm active:scale-95 transition-all"
                     >
                       I'm Safe Now (Dismiss)
                     </button>
