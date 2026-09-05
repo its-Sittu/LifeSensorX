@@ -368,12 +368,11 @@ app.post('/send-alert', async (req, res) => {
           return digits.length >= 10 ? `+91${digits.slice(-10)}` : null;
         }).filter(Boolean);
 
-        // A. Twilio SMS Dispatch (Direct custom text with Maps link, fallback to Trial template)
+        // A. Twilio SMS Dispatch (Only custom emergency text, no dummy appointment templates)
         if (twilioNumber) {
-          console.log(`[Twilio SMS] Sending SMS alerts to (${targetNumbers.length}):`, targetNumbers);
+          console.log(`[Twilio SMS] Attempting custom SMS alerts to (${targetNumbers.length}):`, targetNumbers);
           for (const num of targetNumbers) {
             try {
-              console.log(`[Twilio SMS] Dispatching custom SMS to: ${num}`);
               const smsMsg = await twilioClient.messages.create({
                 from: twilioNumber,
                 to: num,
@@ -382,25 +381,9 @@ app.post('/send-alert', async (req, res) => {
               console.log(`[Twilio SMS] SMS sent to ${num}, SID: ${smsMsg.sid}`);
               smsTwilioStatus.messages.push({ number: num, success: true, sid: smsMsg.sid });
             } catch (individualSmsErr) {
-              // If trial account restricts custom text, fallback to verified trial template
-              if (individualSmsErr.code === 572006 || individualSmsErr.message?.includes('template')) {
-                console.log(`[Twilio SMS] Custom text restricted on trial, retrying with pre-approved template for ${num}`);
-                try {
-                  const retryMsg = await twilioClient.messages.create({
-                    from: twilioNumber,
-                    to: num,
-                    body: 'sms_appointment_reminders'
-                  });
-                  console.log(`[Twilio SMS] Template SMS successfully sent to ${num}, SID: ${retryMsg.sid}`);
-                  smsTwilioStatus.messages.push({ number: num, success: true, sid: retryMsg.sid, mode: 'template_fallback' });
-                } catch (retryErr) {
-                  console.warn(`[Twilio SMS] Template SMS failed for ${num}:`, retryErr.message);
-                  smsTwilioStatus.messages.push({ number: num, success: false, error: retryErr.message });
-                }
-              } else {
-                console.warn(`[Twilio SMS] Failed to send SMS to ${num}:`, individualSmsErr.message);
-                smsTwilioStatus.messages.push({ number: num, success: false, error: individualSmsErr.message });
-              }
+              // Suppress dummy templates on trial accounts - do not send unwanted appointment reminders
+              console.warn(`[Twilio SMS] Custom SMS restricted on trial for ${num} (${individualSmsErr.code}):`, individualSmsErr.message);
+              smsTwilioStatus.messages.push({ number: num, success: false, error: individualSmsErr.message });
             }
           }
           smsTwilioStatus.attempted = true;
