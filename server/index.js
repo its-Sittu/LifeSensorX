@@ -57,6 +57,12 @@ let patients = [];
 // Utils
 const { calculateWaitTime } = require('./utils/prediction');
 const { scoreAndRankHospitals } = require('./utils/scoring');
+const { 
+  startWhatsAppGateway, 
+  sendEmergencyWhatsAppMessage, 
+  getWhatsAppGatewayStatus, 
+  getLatestQrDataUrl 
+} = require('./utils/whatsappGateway');
 
 // Middleware
 app.use(cors());
@@ -326,7 +332,19 @@ app.post('/send-alert', async (req, res) => {
     console.log(`[DEBUG] Final Numbers: ${formattedNumbers}`);
     console.log(`[DEBUG] Message: ${messageBody}`);
 
-    // 4. Twilio AI Voice Calling & SMS Integration (Dispatches to ALL saved emergency contacts)
+    // 4. Free WhatsApp Web Automation Gateway Dispatch (Sends to ALL emergency contacts without any cost/trial limits)
+    let whatsappAutoStatus = { attempted: false, success: false, results: [] };
+    try {
+      console.log(`[WhatsApp Gateway] Triggering auto-dispatch to contacts:`, contacts);
+      const waResult = await sendEmergencyWhatsAppMessage(contacts, messageBody);
+      whatsappAutoStatus = { attempted: true, ...waResult };
+      console.log(`[WhatsApp Gateway] Auto-dispatch result:`, waResult);
+    } catch (waAutoErr) {
+      console.warn(`[WhatsApp Gateway] Auto-dispatch error:`, waAutoErr.message);
+      whatsappAutoStatus = { attempted: true, success: false, error: waAutoErr.message };
+    }
+
+    // 5. Twilio AI Voice Calling & SMS Integration (Dispatches to ALL saved emergency contacts)
     const twilioSid = process.env.TWILIO_ACCOUNT_SID;
     const twilioToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -1073,6 +1091,204 @@ app.put('/api/queue/:id/status', (req, res) => {
   }
 });
 
+/**
+ * ====================================================================
+ * FREE WHATSAPP WEB AUTOMATION GATEWAY (Baileys)
+ * ====================================================================
+ */
+
+// 1. Live WhatsApp Web QR Code HTML Dashboard
+app.get('/api/whatsapp/qr', (req, res) => {
+  const status = getWhatsAppGatewayStatus();
+  const qrDataUrl = getLatestQrDataUrl();
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LifeSensorX - WhatsApp Automation Gateway</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #09090b;
+      color: #fafafa;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 20px;
+      padding: 32px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+    .logo {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 0 0 8px 0;
+      color: #22c55e;
+    }
+    p {
+      font-size: 14px;
+      color: #a1a1aa;
+      margin: 0 0 24px 0;
+      line-height: 1.5;
+    }
+    .qr-container {
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 16px;
+      display: inline-block;
+      margin: 16px 0;
+      box-shadow: 0 0 30px rgba(34, 197, 94, 0.2);
+    }
+    .qr-container img {
+      width: 250px;
+      height: 250px;
+      display: block;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .badge.connected {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .badge.waiting {
+      background: rgba(234, 179, 8, 0.15);
+      color: #eab308;
+      border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+    .steps {
+      text-align: left;
+      background: #09090b;
+      padding: 16px;
+      border-radius: 12px;
+      margin-top: 20px;
+      border: 1px solid #27272a;
+      font-size: 13px;
+    }
+    .steps ol {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      color: #d4d4d8;
+    }
+    .steps li {
+      margin-bottom: 6px;
+    }
+    .btn {
+      background: #22c55e;
+      color: #000;
+      font-weight: 700;
+      padding: 12px 24px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 16px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn:hover {
+      background: #16a34a;
+    }
+  </style>
+  ${!status.isConnected ? '<meta http-equiv="refresh" content="3">' : ''}
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🚨📲</div>
+    <h1>LifeSensorX WhatsApp Gateway</h1>
+    <p>100% Free Automatic Emergency WhatsApp Alert System</p>
+
+    ${status.isConnected ? `
+      <div class="badge connected">
+        <span>●</span> CONNECTED & READY
+      </div>
+      <p style="color: #4ade80; font-weight: bold; font-size: 15px;">
+        ✅ Gateway is active for: ${status.connectedUser}
+      </p>
+      <div class="steps">
+        <b style="color: #fafafa;">Status:</b> Whenever an accident is detected, LifeSensorX will automatically send live GPS location & crash alerts to all emergency contacts!
+      </div>
+      <a href="/api/whatsapp/test?phone=+918789812990" class="btn" target="_blank">Send Test Alert</a>
+    ` : qrDataUrl ? `
+      <div class="badge waiting">
+        <span>●</span> WAITING FOR SCAN (SCAN BELOW)
+      </div>
+      <div class="qr-container">
+        <img src="${qrDataUrl}" alt="WhatsApp Web QR Code" />
+      </div>
+      <div class="steps">
+        <b style="color: #fafafa;">How to Link in 5 Seconds:</b>
+        <ol>
+          <li>Open <b>WhatsApp</b> on your phone.</li>
+          <li>Tap <b>Menu (⋮)</b> or <b>Settings</b> &gt; <b>Linked Devices</b>.</li>
+          <li>Tap <b>Link a Device</b> and point your camera at this QR code.</li>
+        </ol>
+      </div>
+    ` : `
+      <div class="badge waiting">
+        <span>●</span> GENERATING QR CODE...
+      </div>
+      <p>Please wait 2 seconds while WhatsApp gateway initializes...</p>
+    `}
+  </div>
+</body>
+</html>
+  `;
+  res.send(html);
+});
+
+// 2. Gateway Status Endpoint
+app.get('/api/whatsapp/status', (req, res) => {
+  res.json(getWhatsAppGatewayStatus());
+});
+
+// 3. WhatsApp Direct Test Endpoint
+app.all('/api/whatsapp/test', async (req, res) => {
+  try {
+    const targetPhone = req.query.phone || req.body?.phone || '8789812990';
+    const lat = req.query.lat || req.body?.lat || 28.6139;
+    const lng = req.query.lng || req.body?.lng || 77.2090;
+    const mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
+    const timestampStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+    const msg = `🚨 *EMERGENCY CRASH ALERT - LifeSensorX (Auto-Gateway)* 🚨\n\n⚠️ *Accident Detected!* Immediate rescue assistance required.\n\n📍 *Live GPS Accident Location:*\n${mapsLink}\n\n🌐 *Coordinates:* ${lat}, ${lng}\n⏰ *Time:* ${timestampStr}\n\n🏥 *Automated 0-Cost Emergency Dispatch System Active!*`;
+
+    const result = await sendEmergencyWhatsAppMessage([targetPhone], msg);
+    res.json({
+      success: result.success,
+      detail: result,
+      mapsLink
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Health Check
 app.get('/', (req, res) => {
   res.json({
@@ -1086,4 +1302,7 @@ app.get('/', (req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Emergency Backend running on port ${PORT}`);
   console.log(`🔗 Fast2SMS & AI Hospital Scoring active.`);
+  
+  // Start Free WhatsApp Web Automation Gateway
+  startWhatsAppGateway();
 });
