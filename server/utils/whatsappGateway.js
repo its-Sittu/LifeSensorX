@@ -125,22 +125,25 @@ async function sendEmergencyWhatsAppMessage(phoneNumbers, message) {
 
   for (const rawPhone of phoneNumbers) {
     try {
-      const cleanDigits = String(rawPhone).replace(/\D/g, '');
-      let fullNumber = cleanDigits;
-
-      // Ensure Indian country code 91 if 10-digit number
-      if (cleanDigits.length === 10) {
-        fullNumber = `91${cleanDigits}`;
+      const digits = String(rawPhone).replace(/\D/g, '');
+      if (!digits || digits.length < 10) {
+        console.warn(`[WhatsApp Gateway] Invalid phone number skipped: ${rawPhone}`);
+        results.push({ number: rawPhone, success: false, error: "Invalid phone number (must be at least 10 digits)" });
+        continue;
       }
 
+      // Always take last 10 digits and prefix Indian 91 country code
+      const last10 = digits.slice(-10);
+      const fullNumber = `91${last10}`;
       const jid = `${fullNumber}@s.whatsapp.net`;
-      console.log(`[WhatsApp Gateway] Auto-dispatching emergency message to JID: ${jid}`);
+
+      console.log(`[WhatsApp Gateway] Auto-dispatching emergency message to: ${fullNumber} (JID: ${jid})`);
 
       const sentMsg = await sock.sendMessage(jid, { text: message });
-      console.log(`[WhatsApp Gateway] Message delivered to ${fullNumber}, Message ID: ${sentMsg.key?.id}`);
+      console.log(`[WhatsApp Gateway] ✅ Message delivered to ${fullNumber}, Message ID: ${sentMsg.key?.id}`);
       results.push({ number: fullNumber, success: true, messageId: sentMsg.key?.id });
     } catch (err) {
-      console.warn(`[WhatsApp Gateway] Failed to send to ${rawPhone}:`, err.message);
+      console.error(`[WhatsApp Gateway] ❌ Failed to send to ${rawPhone}:`, err.message);
       results.push({ number: rawPhone, success: false, error: err.message });
     }
   }

@@ -17,10 +17,14 @@ interface DeviceData {
   };
 }
 
+import WhatsAppGatewayModal from './WhatsAppGatewayModal';
+import { Smartphone } from 'lucide-react';
+
 const Dashboard: React.FC = () => {
   const triggerEmergency = useEmergencyStore(state => state.triggerEmergency);
   const { socket } = useHospitalSocket();
   const [iotDevice, setIotDevice] = useState<DeviceData | null>(null);
+  const [isWaModalOpen, setIsWaModalOpen] = useState(false);
 
   useEffect(() => {
     unlockAudio();
@@ -108,8 +112,8 @@ const Dashboard: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Sensor Status Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Sensor & Dispatch Status Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* ESP32 / MPU6500 IoT Hardware Status */}
         <div className="glass-card p-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-zinc-400">
@@ -123,17 +127,37 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Emergency System Status */}
+        {/* WhatsApp Gateway Quick Link Card */}
+        <div 
+          onClick={() => setIsWaModalOpen(true)}
+          className="glass-card p-4 flex items-center justify-between hover:border-emerald-500/50 cursor-pointer transition-all active:scale-98 group"
+        >
+          <div className="flex items-center gap-2 text-zinc-400 group-hover:text-emerald-400">
+            <Smartphone size={16} className="text-emerald-400" />
+            <span className="text-xs uppercase tracking-wider font-semibold">WhatsApp Gateway</span>
+          </div>
+          <p className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 rounded-md">
+            Scan / Status 📲
+          </p>
+        </div>
+
+        {/* Emergency Voice & SMS Status */}
         <div className="glass-card p-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-zinc-400">
             <ShieldCheck size={16} className="text-emerald-400" />
-            <span className="text-xs uppercase tracking-wider font-semibold">Automatic Dispatch</span>
+            <span className="text-xs uppercase tracking-wider font-semibold">AI Dispatch</span>
           </div>
           <p className="text-sm font-medium text-emerald-400 font-mono">
-            Direct Siren & SMS Armed
+            Calls & Maps Armed
           </p>
         </div>
       </div>
+
+      {/* WhatsApp Gateway Modal for All Users */}
+      <WhatsAppGatewayModal 
+        isOpen={isWaModalOpen}
+        onClose={() => setIsWaModalOpen(false)}
+      />
     </div>
   );
 };
