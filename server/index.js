@@ -325,13 +325,14 @@ app.post('/send-alert', async (req, res) => {
     console.log(`[DEBUG] Final Numbers: ${formattedNumbers}`);
     console.log(`[DEBUG] Message: ${messageBody}`);
 
-    // 4. Twilio AI Voice Calling Integration (Calls ALL saved emergency contacts)
+    // 4. Twilio AI Voice Calling & SMS Integration (Dispatches to ALL saved emergency contacts)
     const twilioSid = process.env.TWILIO_ACCOUNT_SID;
     const twilioToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
     const twilioWhatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+17372508034';
 
     let callStatus = { attempted: false, success: false, calls: [] };
+    let smsTwilioStatus = { attempted: false, success: false, messages: [] };
     let whatsappStatus = { attempted: false, success: false, messages: [] };
 
     if (twilioSid && twilioToken && contacts.length > 0) {
@@ -347,15 +348,52 @@ app.post('/send-alert', async (req, res) => {
           return digits.length >= 10 ? `+91${digits.slice(-10)}` : null;
         }).filter(Boolean);
 
-        // A. Twilio WhatsApp Alert Dispatch (Accident alert + Live Google Maps Link)
-        const whatsappMessageBody = `🚨 *EMERGENCY CRASH ALERT - LifeSensorX* 🚨\n\n⚠️ *Accident Detected!* An emergency crash event has occurred.\n\n📍 *Live Accident GPS Location:*\n${mapsLink}\n\n🌐 *Coordinates:* ${latitude}, ${longitude}\n⏰ *Time:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n🏥 *Immediate medical assistance & rescue required!*`;
+        // A. Twilio SMS Dispatch (Direct custom text with Maps link, fallback to Trial template)
+        if (twilioNumber) {
+          console.log(`[Twilio SMS] Sending SMS alerts to (${targetNumbers.length}):`, targetNumbers);
+          for (const num of targetNumbers) {
+            try {
+              console.log(`[Twilio SMS] Dispatching custom SMS to: ${num}`);
+              const smsMsg = await twilioClient.messages.create({
+                from: twilioNumber,
+                to: num,
+                body: `🚨 LifeSensorX Alert: Accident detected at ${mapsLink}`
+              });
+              console.log(`[Twilio SMS] SMS sent to ${num}, SID: ${smsMsg.sid}`);
+              smsTwilioStatus.messages.push({ number: num, success: true, sid: smsMsg.sid });
+            } catch (individualSmsErr) {
+              // If trial account restricts custom text, fallback to verified trial template
+              if (individualSmsErr.code === 572006 || individualSmsErr.message?.includes('template')) {
+                console.log(`[Twilio SMS] Custom text restricted on trial, retrying with pre-approved template for ${num}`);
+                try {
+                  const retryMsg = await twilioClient.messages.create({
+                    from: twilioNumber,
+                    to: num,
+                    body: 'sms_appointment_reminders'
+                  });
+                  console.log(`[Twilio SMS] Template SMS successfully sent to ${num}, SID: ${retryMsg.sid}`);
+                  smsTwilioStatus.messages.push({ number: num, success: true, sid: retryMsg.sid, mode: 'template_fallback' });
+                } catch (retryErr) {
+                  console.warn(`[Twilio SMS] Template SMS failed for ${num}:`, retryErr.message);
+                  smsTwilioStatus.messages.push({ number: num, success: false, error: retryErr.message });
+                }
+              } else {
+                console.warn(`[Twilio SMS] Failed to send SMS to ${num}:`, individualSmsErr.message);
+                smsTwilioStatus.messages.push({ number: num, success: false, error: individualSmsErr.message });
+              }
+            }
+          }
+          smsTwilioStatus.attempted = true;
+          smsTwilioStatus.success = smsTwilioStatus.messages.some(m => m.success);
+        }
 
-        console.log(`[Twilio WhatsApp] Sending WhatsApp alerts to (${targetNumbers.length}):`, targetNumbers);
+        // B. Twilio WhatsApp Alert Dispatch
+        const whatsappMessageBody = `🚨 *EMERGENCY CRASH ALERT - LifeSensorX* 🚨\n\n⚠️ *Accident Detected!* An emergency crash event has occurred.\n\n📍 *Live Accident GPS Location:*\n${mapsLink}\n\n🌐 *Coordinates:* ${latitude}, ${longitude}\n⏰ *Time:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n🏥 *Immediate medical assistance & rescue required!*`;
 
         for (const num of targetNumbers) {
           const waRecipient = `whatsapp:${num}`;
           try {
-            console.log(`[Twilio WhatsApp] Dispatching WhatsApp message to: ${waRecipient} from: ${twilioWhatsappNumber}`);
+            console.log(`[Twilio WhatsApp] Dispatching WhatsApp message to: ${waRecipient}`);
             const waMsg = await twilioClient.messages.create({
               from: twilioWhatsappNumber,
               to: waRecipient,
@@ -364,7 +402,7 @@ app.post('/send-alert', async (req, res) => {
             console.log(`[Twilio WhatsApp] Message sent to ${waRecipient}, SID: ${waMsg.sid}`);
             whatsappStatus.messages.push({ number: waRecipient, success: true, sid: waMsg.sid });
           } catch (individualWaErr) {
-            console.warn(`[Twilio WhatsApp] Failed to send WhatsApp to ${waRecipient}:`, individualWaErr.message);
+            console.warn(`[Twilio WhatsApp] Note for ${waRecipient}:`, individualWaErr.message);
             whatsappStatus.messages.push({ number: waRecipient, success: false, error: individualWaErr.message });
           }
         }
@@ -372,7 +410,7 @@ app.post('/send-alert', async (req, res) => {
         whatsappStatus.attempted = true;
         whatsappStatus.success = whatsappStatus.messages.some(m => m.success);
 
-        // B. Twilio Voice Calls Dispatch
+        // C. Twilio Voice Calls Dispatch
         if (twilioNumber) {
           console.log(`[Twilio Voice] Emergency contacts to call (${targetNumbers.length}):`, targetNumbers);
           for (const num of targetNumbers) {
