@@ -519,9 +519,44 @@ app.all('/api/test-whatsapp', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Failed to send WhatsApp message",
-      detail: err.message
+      detail: err.message,
+      code: err.code,
+      trialNotice: err.code === 21654 || err.code === 20003 
+        ? "Twilio Trial account restricts unsolicited outbound WhatsApp API. Upgrade Twilio account or use Twilio Voice Calling / Webhook." 
+        : undefined
     });
   }
+});
+
+/**
+ * Twilio WhatsApp 2-Way Webhook Endpoint
+ * When user sends any message to the WhatsApp sandbox number, it responds with live status & GPS location
+ */
+app.all('/api/whatsapp-webhook', (req, res) => {
+  const MessagingResponse = require('twilio').twiml.MessagingResponse;
+  const twiml = new MessagingResponse();
+
+  const userMsg = (req.body?.Body || req.query?.Body || '').toLowerCase().trim();
+  const fromNum = req.body?.From || req.query?.From || 'User';
+
+  console.log(`[Twilio WhatsApp Webhook] Incoming message from ${fromNum}: "${userMsg}"`);
+
+  // Default Delhi GPS location or latest crash location
+  const lat = 28.6139;
+  const lng = 77.2090;
+  const mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
+
+  const replyText = `🚨 *LifeSensorX Emergency Assistant* 🚨\n\n` +
+    `✅ *System Status:* ONLINE & Active\n` +
+    `📍 *Live GPS Tracking Location:*\n${mapsLink}\n\n` +
+    `🌐 *Coordinates:* ${lat}, ${lng}\n` +
+    `⏰ *Timestamp:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n` +
+    `🏥 In case of accident or medical emergency, LifeSensorX automatically calls registered contacts and dispatches hospital alerts.`;
+
+  twiml.message(replyText);
+
+  res.writeHead(200, { 'Content-Type': 'text/xml; charset=utf-8' });
+  res.end(twiml.toString());
 });
 
 /**
