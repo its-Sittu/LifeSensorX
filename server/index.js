@@ -320,7 +320,8 @@ app.post('/send-alert', async (req, res) => {
 
     // 3. Generate Message
     const mapsLink = `https://maps.google.com/?q=${latitude},${longitude}`;
-    const messageBody = `🚨 EMERGENCY ALERT!\nAccident detected at this location:\n${mapsLink}\n\nPlease help!`;
+    const timestampStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+    const messageBody = `🚨 EMERGENCY CRASH ALERT - LifeSensorX 🚨\n\n⚠️ ACCIDENT DETECTED!\nImmediate assistance required.\n\n📍 Live GPS Location:\n${mapsLink}\n\n🌐 Coordinates: ${latitude}, ${longitude}\n⏰ Time: ${timestampStr}\n\n🏥 Please reach out or send emergency rescue immediately!`;
 
     console.log(`[DEBUG] Final Numbers: ${formattedNumbers}`);
     console.log(`[DEBUG] Message: ${messageBody}`);

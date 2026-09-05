@@ -158,12 +158,13 @@ const EmergencyModal: React.FC = () => {
   };
 
   const getEmergencyMessage = () => {
-    let message = `🚨 Emergency Alert!\nA possible accident has been detected.\nI may need immediate assistance.\n\n`;
+    const timestampStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+    let message = `🚨 *EMERGENCY CRASH ALERT - LifeSensorX* 🚨\n\n⚠️ *ACCIDENT DETECTED!*\nA critical crash event has occurred. I may need immediate medical assistance.\n\n`;
     if (location.latitude && location.longitude) {
       const mapsLink = `https://maps.google.com/?q=${location.latitude},${location.longitude}`;
-      message += `📍 My current location:\n${mapsLink}\n\n`;
+      message += `📍 *Live GPS Accident Location:*\n${mapsLink}\n\n🌐 *Coordinates:* ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}\n`;
     }
-    message += `Please reach me immediately or send help.`;
+    message += `⏰ *Time:* ${timestampStr}\n\n🏥 *Please call me or send emergency rescue / ambulance immediately!*`;
     return message;
   };
 
