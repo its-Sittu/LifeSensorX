@@ -153,6 +153,33 @@ async function sendEmergencyWhatsAppMessage(phoneNumbers, message) {
   };
 }
 
+async function logoutWhatsAppGateway() {
+  try {
+    if (sock) {
+      try {
+        await sock.logout();
+      } catch (e) {}
+    }
+  } catch (err) {}
+
+  isConnected = false;
+  connectedUser = null;
+  latestQrString = null;
+  latestQrDataUrl = null;
+  isInitializing = false;
+
+  try {
+    fs.rmSync(authDir, { recursive: true, force: true });
+    fs.mkdirSync(authDir, { recursive: true });
+  } catch (e) {}
+
+  setTimeout(() => {
+    startWhatsAppGateway();
+  }, 1000);
+
+  return { success: true, message: "Logged out. Fresh QR will be ready in 2 seconds." };
+}
+
 function getWhatsAppGatewayStatus() {
   return {
     isConnected,
@@ -169,5 +196,6 @@ module.exports = {
   startWhatsAppGateway,
   sendEmergencyWhatsAppMessage,
   getWhatsAppGatewayStatus,
-  getLatestQrDataUrl
+  getLatestQrDataUrl,
+  logoutWhatsAppGateway
 };

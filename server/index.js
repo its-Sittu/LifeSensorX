@@ -61,7 +61,8 @@ const {
   startWhatsAppGateway, 
   sendEmergencyWhatsAppMessage, 
   getWhatsAppGatewayStatus, 
-  getLatestQrDataUrl 
+  getLatestQrDataUrl,
+  logoutWhatsAppGateway
 } = require('./utils/whatsappGateway');
 
 // Middleware
@@ -1233,7 +1234,10 @@ app.get('/api/whatsapp/qr', (req, res) => {
       <div class="steps">
         <b style="color: #fafafa;">Status:</b> Whenever an accident is detected, LifeSensorX will automatically send live GPS location & crash alerts to all emergency contacts!
       </div>
-      <a href="/api/whatsapp/test?phone=+918789812990" class="btn" target="_blank">Send Test Alert</a>
+      <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px;">
+        <a href="/api/whatsapp/test?phone=+918789812990" class="btn" target="_blank">Send Test Alert</a>
+        <a href="/api/whatsapp/logout" class="btn" style="background: #ef4444; color: #fff;">Disconnect / Scan New Number</a>
+      </div>
     ` : qrDataUrl ? `
       <div class="badge waiting">
         <span>●</span> WAITING FOR SCAN (SCAN BELOW)
@@ -1262,12 +1266,18 @@ app.get('/api/whatsapp/qr', (req, res) => {
   res.send(html);
 });
 
-// 2. Gateway Status Endpoint
+// 2. Gateway Logout / Re-Scan Endpoint
+app.all('/api/whatsapp/logout', async (req, res) => {
+  const result = await logoutWhatsAppGateway();
+  res.redirect('/api/whatsapp/qr');
+});
+
+// 3. Gateway Status Endpoint
 app.get('/api/whatsapp/status', (req, res) => {
   res.json(getWhatsAppGatewayStatus());
 });
 
-// 3. WhatsApp Direct Test Endpoint
+// 4. WhatsApp Direct Test Endpoint
 app.all('/api/whatsapp/test', async (req, res) => {
   try {
     const targetPhone = req.query.phone || req.body?.phone || '8789812990';
