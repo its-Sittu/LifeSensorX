@@ -359,63 +359,19 @@ const EmergencyModal: React.FC = () => {
                     </div>
                   )}
 
-                  {/* 1-Click Direct WhatsApp & SMS Sharing */}
-                  <div className="w-full flex flex-col gap-2 mt-3">
-                    <button 
-                      onClick={sendWhatsApp}
-                      className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(37,211,102,0.5)] active:scale-95 transition-all cursor-pointer"
-                    >
-                      <span className="text-lg">📲</span>
-                      <span>Send Live Location via WhatsApp (Free)</span>
-                    </button>
-                    <button 
-                      onClick={sendSMS}
-                      className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
-                    >
-                      <span>💬</span>
-                      <span>Open Phone Native SMS</span>
-                    </button>
-                  </div>
-
-                  <div className="w-full flex gap-3 mt-2">
+                  <div className="w-full flex gap-3 mt-4">
                     <button 
                       onClick={() => {
                         cancelEmergency();
                         closeEmergencyModal();
                       }}
-                      className="w-full py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm active:scale-95 transition-all"
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-[0_0_20px_rgba(16,185,129,0.4)] active:scale-95 transition-all cursor-pointer"
                     >
-                      I'm Safe Now (Dismiss)
+                      I'm Safe Now — Dismiss
                     </button>
                   </div>
                 </motion.div>
-              ) : (
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="w-full flex flex-col gap-4 mt-2"
-                >
-                  <h2 className="text-2xl font-bold text-white mb-2">Send Alert Via:</h2>
-                  <button 
-                    onClick={sendWhatsApp}
-                    className="w-full py-4 rounded-2xl bg-[#25D366] text-white text-lg font-bold flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(37,211,102,0.4)] active:scale-95 transition-all"
-                  >
-                    Send via WhatsApp
-                  </button>
-                  <button 
-                    onClick={sendSMS}
-                    className="w-full py-4 rounded-2xl bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(37,99,235,0.4)] active:scale-95 transition-all"
-                  >
-                    Send via SMS
-                  </button>
-                  <button 
-                    onClick={handleSafe}
-                    className="mt-4 text-zinc-300 font-medium hover:text-white"
-                  >
-                    Dismiss
-                  </button>
-                </motion.div>
-              )}
+              ) : null}
             </div>
           </motion.div>
         )}

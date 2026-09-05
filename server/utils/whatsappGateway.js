@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const QRCode = require('qrcode');
 const path = require('path');
@@ -9,7 +9,7 @@ let latestQrString = null;
 let latestQrDataUrl = null;
 let isConnected = false;
 let connectedUser = null;
-let connectionAttempts = 0;
+let isInitializing = false;
 
 const authDir = path.join(__dirname, '..', 'auth_info_baileys');
 
@@ -19,19 +19,30 @@ if (!fs.existsSync(authDir)) {
 }
 
 async function startWhatsAppGateway() {
+  if (isInitializing) return;
+  isInitializing = true;
+
   try {
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
     const { version, isLatest } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307], isLatest: true }));
 
-    console.log(`[WhatsApp Gateway] Starting with Baileys v${version.join('.')} (isLatest: ${isLatest})`);
+    console.log(`[WhatsApp Gateway] Starting Baileys v${version.join('.')} (isLatest: ${isLatest})`);
+
+    const logger = pino({ level: 'silent' });
 
     sock = makeWASocket({
       version,
-      auth: state,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, logger)
+      },
       printQRInTerminal: true,
-      logger: pino({ level: 'silent' }), // Keep server logs clean
+      logger,
       browser: ['LifeSensorX Emergency Gateway', 'Chrome', '1.0.0'],
-      syncFullHistory: false
+      syncFullHistory: false,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -55,6 +66,7 @@ async function startWhatsAppGateway() {
       if (connection === 'close') {
         isConnected = false;
         connectedUser = null;
+        isInitializing = false;
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
@@ -71,15 +83,16 @@ async function startWhatsAppGateway() {
         }
 
         if (shouldReconnect) {
-          connectionAttempts++;
-          const delay = Math.min(connectionAttempts * 2000, 10000);
-          setTimeout(() => startWhatsAppGateway(), delay);
+          setTimeout(() => {
+            isInitializing = false;
+            startWhatsAppGateway();
+          }, 3000);
         }
       } else if (connection === 'open') {
         isConnected = true;
+        isInitializing = false;
         latestQrString = null;
         latestQrDataUrl = null;
-        connectionAttempts = 0;
         connectedUser = sock.user?.id || 'Connected';
         console.log(`\n==================================================`);
         console.log(`✅ [WhatsApp Gateway] WHATSAPP CONNECTED SUCCESSFULLY!`);
