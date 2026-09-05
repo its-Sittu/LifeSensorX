@@ -329,10 +329,12 @@ app.post('/send-alert', async (req, res) => {
     const twilioSid = process.env.TWILIO_ACCOUNT_SID;
     const twilioToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
+    const twilioWhatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+17372508034';
 
     let callStatus = { attempted: false, success: false, calls: [] };
+    let whatsappStatus = { attempted: false, success: false, messages: [] };
 
-    if (twilioSid && twilioToken && twilioNumber && contacts.length > 0) {
+    if (twilioSid && twilioToken && contacts.length > 0) {
       try {
         const twilio = require('twilio');
         const twilioClient = twilio(twilioSid, twilioToken);
@@ -345,30 +347,57 @@ app.post('/send-alert', async (req, res) => {
           return digits.length >= 10 ? `+91${digits.slice(-10)}` : null;
         }).filter(Boolean);
 
-        console.log(`[Twilio Voice] Emergency contacts to call (${targetNumbers.length}):`, targetNumbers);
+        // A. Twilio WhatsApp Alert Dispatch (Accident alert + Live Google Maps Link)
+        const whatsappMessageBody = `🚨 *EMERGENCY CRASH ALERT - LifeSensorX* 🚨\n\n⚠️ *Accident Detected!* An emergency crash event has occurred.\n\n📍 *Live Accident GPS Location:*\n${mapsLink}\n\n🌐 *Coordinates:* ${latitude}, ${longitude}\n⏰ *Time:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n🏥 *Immediate medical assistance & rescue required!*`;
 
-        // Call each emergency contact
+        console.log(`[Twilio WhatsApp] Sending WhatsApp alerts to (${targetNumbers.length}):`, targetNumbers);
+
         for (const num of targetNumbers) {
+          const waRecipient = `whatsapp:${num}`;
           try {
-            console.log(`[Twilio Voice] Triggering call to: ${num}`);
-            const call = await twilioClient.calls.create({
-              url: twimlUrl,
-              to: num,
-              from: twilioNumber
+            console.log(`[Twilio WhatsApp] Dispatching WhatsApp message to: ${waRecipient} from: ${twilioWhatsappNumber}`);
+            const waMsg = await twilioClient.messages.create({
+              from: twilioWhatsappNumber,
+              to: waRecipient,
+              body: whatsappMessageBody
             });
-            console.log(`[Twilio Voice] Call placed to ${num}, SID: ${call.sid}`);
-            callStatus.calls.push({ number: num, success: true, sid: call.sid });
-          } catch (individualCallErr) {
-            console.warn(`[Twilio Voice] Failed to call ${num}:`, individualCallErr.message);
-            callStatus.calls.push({ number: num, success: false, error: individualCallErr.message });
+            console.log(`[Twilio WhatsApp] Message sent to ${waRecipient}, SID: ${waMsg.sid}`);
+            whatsappStatus.messages.push({ number: waRecipient, success: true, sid: waMsg.sid });
+          } catch (individualWaErr) {
+            console.warn(`[Twilio WhatsApp] Failed to send WhatsApp to ${waRecipient}:`, individualWaErr.message);
+            whatsappStatus.messages.push({ number: waRecipient, success: false, error: individualWaErr.message });
           }
         }
 
-        callStatus.attempted = true;
-        callStatus.success = callStatus.calls.some(c => c.success);
-      } catch (voiceErr) {
-        console.warn(`[Twilio Voice] Voice batch error:`, voiceErr.message);
-        callStatus = { attempted: true, success: false, error: voiceErr.message };
+        whatsappStatus.attempted = true;
+        whatsappStatus.success = whatsappStatus.messages.some(m => m.success);
+
+        // B. Twilio Voice Calls Dispatch
+        if (twilioNumber) {
+          console.log(`[Twilio Voice] Emergency contacts to call (${targetNumbers.length}):`, targetNumbers);
+          for (const num of targetNumbers) {
+            try {
+              console.log(`[Twilio Voice] Triggering call to: ${num}`);
+              const call = await twilioClient.calls.create({
+                url: twimlUrl,
+                to: num,
+                from: twilioNumber
+              });
+              console.log(`[Twilio Voice] Call placed to ${num}, SID: ${call.sid}`);
+              callStatus.calls.push({ number: num, success: true, sid: call.sid });
+            } catch (individualCallErr) {
+              console.warn(`[Twilio Voice] Failed to call ${num}:`, individualCallErr.message);
+              callStatus.calls.push({ number: num, success: false, error: individualCallErr.message });
+            }
+          }
+
+          callStatus.attempted = true;
+          callStatus.success = callStatus.calls.some(c => c.success);
+        }
+      } catch (twilioErr) {
+        console.warn(`[Twilio Service] Twilio dispatch error:`, twilioErr.message);
+        whatsappStatus = { attempted: true, success: false, error: twilioErr.message };
+        callStatus = { attempted: true, success: false, error: twilioErr.message };
       }
     }
 
@@ -381,6 +410,7 @@ app.post('/send-alert', async (req, res) => {
         message: "Emergency alert simulated successfully (Demo mode)",
         request_id: "sim_" + Date.now(),
         mapsLink,
+        whatsappStatus,
         callStatus
       });
     }
@@ -403,9 +433,10 @@ app.post('/send-alert', async (req, res) => {
       if (response.data && response.data.return === true) {
         return res.status(200).json({
           success: true,
-          message: "Emergency SMS and Voice Call dispatched successfully",
+          message: "Emergency SMS, WhatsApp and Voice Call dispatched successfully",
           request_id: response.data.request_id,
           mapsLink,
+          whatsappStatus,
           callStatus
         });
       } else {
@@ -415,6 +446,7 @@ app.post('/send-alert', async (req, res) => {
           gateway: 'fallback',
           message: response.data?.message || "Emergency alert dispatched",
           mapsLink,
+          whatsappStatus,
           callStatus
         });
       }
@@ -427,6 +459,7 @@ app.post('/send-alert', async (req, res) => {
         message: `Alert processed. Live GPS maps link ready.`,
         detail: errorMsg,
         mapsLink,
+        whatsappStatus,
         callStatus
       });
     }
@@ -438,6 +471,55 @@ app.post('/send-alert', async (req, res) => {
       success: false,
       error: "Failed to process emergency alert.",
       detail: errorDetail
+    });
+  }
+});
+
+/**
+ * Direct WhatsApp Alert API Endpoint
+ * POST /api/emergency/whatsapp or GET /api/test-whatsapp
+ */
+app.all('/api/test-whatsapp', async (req, res) => {
+  try {
+    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioWhatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+17372508034';
+    const targetPhone = req.query.phone || req.body?.phone || '+918789812990';
+    const lat = req.query.lat || req.body?.lat || 28.6139;
+    const lng = req.query.lng || req.body?.lng || 77.2090;
+
+    if (!twilioSid || !twilioToken) {
+      return res.status(500).json({ success: false, error: "Twilio credentials not configured." });
+    }
+
+    const cleanDigits = String(targetPhone).replace(/\D/g, '').slice(-10);
+    const waRecipient = `whatsapp:+91${cleanDigits}`;
+    const mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
+
+    const messageBody = `🚨 *EMERGENCY CRASH ALERT - LifeSensorX* 🚨\n\n⚠️ *Accident Detected!* An emergency crash event has been reported.\n\n📍 *Live GPS Accident Location:*\n${mapsLink}\n\n🌐 *Coordinates:* ${lat}, ${lng}\n⏰ *Time:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n🏥 *Immediate assistance requested!*`;
+
+    const twilio = require('twilio');
+    const twilioClient = twilio(twilioSid, twilioToken);
+
+    const result = await twilioClient.messages.create({
+      from: twilioWhatsappNumber,
+      to: waRecipient,
+      body: messageBody
+    });
+
+    return res.json({
+      success: true,
+      message: `WhatsApp alert sent successfully to ${waRecipient}`,
+      sid: result.sid,
+      status: result.status,
+      mapsLink
+    });
+  } catch (err) {
+    console.error("[Twilio WhatsApp Direct Test Error]:", err);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to send WhatsApp message",
+      detail: err.message
     });
   }
 });
