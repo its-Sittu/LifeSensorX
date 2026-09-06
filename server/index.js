@@ -59,6 +59,7 @@ const { calculateWaitTime } = require('./utils/prediction');
 const { scoreAndRankHospitals } = require('./utils/scoring');
 const { 
   startWhatsAppGateway, 
+  refreshWhatsAppGateway,
   sendEmergencyWhatsAppMessage, 
   getWhatsAppGatewayStatus, 
   getLatestQrDataUrl,
@@ -1252,7 +1253,17 @@ app.get('/api/whatsapp/qr', (req, res) => {
 // 2. Gateway Logout / Re-Scan Endpoint
 app.all('/api/whatsapp/logout', async (req, res) => {
   const result = await logoutWhatsAppGateway();
-  res.redirect('/api/whatsapp/qr');
+  res.json({ success: true, message: "Logged out. Fresh QR is initializing..." });
+});
+
+// 2b. Gateway Refresh / Re-initialize Endpoint
+app.all('/api/whatsapp/refresh', async (req, res) => {
+  try {
+    await refreshWhatsAppGateway();
+    res.json({ success: true, message: "WhatsApp Gateway refreshed." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // 3. Gateway Status Endpoint

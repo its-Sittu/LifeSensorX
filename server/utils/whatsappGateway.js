@@ -183,11 +183,29 @@ async function logoutWhatsAppGateway() {
   return { success: true, message: "Logged out. Fresh QR will be ready in 2 seconds." };
 }
 
+async function refreshWhatsAppGateway() {
+  try {
+    if (sock) {
+      try {
+        sock.ev.removeAllListeners();
+        sock.end(undefined);
+      } catch (e) {}
+      sock = null;
+    }
+  } catch (err) {}
+  isInitializing = false;
+  latestQrString = null;
+  latestQrDataUrl = null;
+  return startWhatsAppGateway();
+}
+
 function getWhatsAppGatewayStatus() {
+  const cleanUser = connectedUser ? connectedUser.replace(/:.*@s.whatsapp.net/, '').replace(/@s.whatsapp.net/, '') : null;
   return {
     isConnected,
-    connectedUser,
-    hasQr: Boolean(latestQrDataUrl)
+    connectedUser: cleanUser,
+    hasQr: Boolean(latestQrDataUrl),
+    qr: latestQrDataUrl
   };
 }
 
@@ -197,8 +215,10 @@ function getLatestQrDataUrl() {
 
 module.exports = {
   startWhatsAppGateway,
+  refreshWhatsAppGateway,
   sendEmergencyWhatsAppMessage,
   getWhatsAppGatewayStatus,
   getLatestQrDataUrl,
   logoutWhatsAppGateway
 };
+

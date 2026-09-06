@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useEmergencyStore } from '../store/useEmergencyStore';
 import { sendEmergencySMS, fetchNearbyHospitals, getBackendUrl } from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, AlertTriangle, CheckCircle, Sparkles, Navigation, Phone, ShieldCheck } from 'lucide-react';
+import { Volume2, VolumeX, AlertTriangle, CheckCircle, Sparkles, Navigation, Phone, ShieldCheck, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 import CountdownTimer from './CountdownTimer';
 import AlertPopup from './AlertPopup';
@@ -350,7 +350,7 @@ const EmergencyModal: React.FC = () => {
                         )}
                         <button 
                           onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${recommendedHospital.location.lat},${recommendedHospital.location.lng}`, '_blank')}
-                          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-[0_0_15px_rgba(6,182,212,0.3)] cursor-pointer"
                         >
                           <Navigation size={14} />
                           Directions
@@ -359,7 +359,39 @@ const EmergencyModal: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="w-full flex gap-3 mt-4">
+                  {/* Quick Individual Contact Actions */}
+                  <div className="w-full grid grid-cols-2 gap-2 mt-2">
+                    <button
+                      onClick={sendWhatsApp}
+                      className="py-2.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                    >
+                      <MessageSquare size={14} className="text-emerald-400" />
+                      <span>WhatsApp Alert</span>
+                    </button>
+                    <button
+                      onClick={sendSMS}
+                      className="py-2.5 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                    >
+                      <Phone size={14} className="text-blue-400" />
+                      <span>Direct SMS App</span>
+                    </button>
+                    <a
+                      href="tel:108"
+                      className="py-2.5 px-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                    >
+                      <Phone size={14} className="text-red-400" />
+                      <span>Call 108 Ambulance</span>
+                    </a>
+                    <a
+                      href="tel:112"
+                      className="py-2.5 px-3 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                    >
+                      <Phone size={14} className="text-amber-400" />
+                      <span>Call 112 SOS</span>
+                    </a>
+                  </div>
+
+                  <div className="w-full flex gap-3 mt-3">
                     <button 
                       onClick={() => {
                         cancelEmergency();

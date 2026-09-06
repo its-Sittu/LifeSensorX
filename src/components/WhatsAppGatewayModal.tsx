@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { QrCode, CheckCircle2, AlertCircle, RefreshCw, X, Send, Smartphone, ShieldCheck } from 'lucide-react';
+import { QrCode, CheckCircle2, AlertCircle, RefreshCw, X, Send, Smartphone, ShieldCheck, Zap, Info } from 'lucide-react';
 import { getBackendUrl } from '../utils/api';
 
 interface GatewayStatus {
   isConnected: boolean;
   connectedUser: string | null;
   hasQr: boolean;
+  qr?: string | null;
 }
 
 interface WhatsAppGatewayModalProps {
@@ -15,10 +16,11 @@ interface WhatsAppGatewayModalProps {
 }
 
 const WhatsAppGatewayModal: React.FC<WhatsAppGatewayModalProps> = ({ isOpen, onClose }) => {
-  const [status, setStatus] = useState<GatewayStatus>({ isConnected: false, connectedUser: null, hasQr: false });
+  const [status, setStatus] = useState<GatewayStatus>({ isConnected: false, connectedUser: null, hasQr: false, qr: null });
   const [testPhone, setTestPhone] = useState('');
   const [testResult, setTestResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
 
   const backendUrl = getBackendUrl() || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://lifesensorx.onrender.com');
@@ -39,9 +41,21 @@ const WhatsAppGatewayModal: React.FC<WhatsAppGatewayModalProps> = ({ isOpen, onC
     if (!isOpen) return;
 
     fetchStatus();
-    const interval = setInterval(fetchStatus, 3000);
+    const interval = setInterval(fetchStatus, 2000);
     return () => clearInterval(interval);
   }, [isOpen]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetch(`${backendUrl}/api/whatsapp/refresh`, { method: 'POST' });
+      await fetchStatus();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 800);
+    }
+  };
 
   const handleDisconnect = async () => {
     setIsLoading(true);
@@ -63,7 +77,7 @@ const WhatsAppGatewayModal: React.FC<WhatsAppGatewayModalProps> = ({ isOpen, onC
       const res = await fetch(`${backendUrl}/api/whatsapp/test?phone=${encodeURIComponent(testPhone)}`);
       const data = await res.json();
       if (data.success) {
-        setTestResult(`✅ Test emergency alert sent to +91${testPhone.slice(-10)}!`);
+        setTestResult(`✅ Test alert sent successfully to +91 ${testPhone.slice(-10)}!`);
       } else {
         setTestResult(`❌ Failed: ${data.error || 'Check gateway connection'}`);
       }
@@ -80,10 +94,10 @@ const WhatsAppGatewayModal: React.FC<WhatsAppGatewayModalProps> = ({ isOpen, onC
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl overflow-hidden"
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
         >
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
@@ -98,23 +112,23 @@ const WhatsAppGatewayModal: React.FC<WhatsAppGatewayModalProps> = ({ isOpen, onC
             </div>
             <button 
               onClick={onClose}
-              className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all"
+              className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all cursor-pointer"
             >
               <X size={18} />
             </button>
           </div>
 
           {/* Status Badge */}
-          <div className="my-5 flex items-center justify-center">
+          <div className="my-4 flex items-center justify-center">
             {status.isConnected ? (
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold">
                 <CheckCircle2 size={16} className="text-emerald-400" />
-                <span>CONNECTED & READY ({status.connectedUser || 'Active'})</span>
+                <span>CONNECTED & READY ({status.connectedUser || 'Active Device'})</span>
               </div>
             ) : (
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold animate-pulse">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold animate-pulse">
                 <AlertCircle size={16} className="text-amber-400" />
-                <span>WAITING FOR SCAN — LINK A DEVICE</span>
+                <span>WAITING FOR SCAN — LINK YOUR WHATSAPP</span>
               </div>
             )}
           </div>
@@ -122,13 +136,13 @@ const WhatsAppGatewayModal: React.FC<WhatsAppGatewayModalProps> = ({ isOpen, onC
           {/* Body Content */}
           {status.isConnected ? (
             <div className="flex flex-col gap-4 text-center">
-              <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 text-left">
+              <div className="p-4 rounded-xl bg-zinc-950 border border-emerald-500/30 text-left">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm mb-1">
                   <ShieldCheck size={18} />
                   <span>Automatic Dispatch Armed</span>
                 </div>
                 <p className="text-xs text-zinc-400 leading-relaxed">
-                  Whenever an accident or SOS occurs, LifeSensorX will automatically send live GPS location and crash details to all emergency contacts from this linked WhatsApp account.
+                  Whenever an accident or SOS is triggered, LifeSensorX will automatically send live GPS location and crash details to all your emergency contacts via WhatsApp.
                 </p>
               </div>
 
@@ -149,42 +163,77 @@ const WhatsAppGatewayModal: React.FC<WhatsAppGatewayModalProps> = ({ isOpen, onC
                     className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Send size={14} />
-                    <span>{isSendingTest ? 'Sending...' : 'Send'}</span>
+                    <span>{isSendingTest ? 'Sending...' : 'Send Test'}</span>
                   </button>
                 </div>
                 {testResult && (
-                  <p className="text-xs mt-2 font-medium">{testResult}</p>
+                  <p className={`text-xs mt-2 font-medium ${testResult.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {testResult}
+                  </p>
                 )}
               </div>
 
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-1">
                 <button 
                   onClick={handleDisconnect}
                   disabled={isLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/40 text-xs font-bold transition-all cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/40 text-xs font-bold transition-all cursor-pointer"
                 >
-                  {isLoading ? 'Disconnecting...' : 'Disconnect / Link New WhatsApp'}
+                  {isLoading ? 'Disconnecting...' : 'Disconnect / Link Another WhatsApp'}
                 </button>
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center text-center">
-              {/* Live QR Frame */}
-              <div className="p-3 bg-white rounded-2xl shadow-xl my-2">
-                <iframe 
-                  src={`${backendUrl}/api/whatsapp/qr`}
-                  title="WhatsApp QR Scanner"
-                  className="w-[280px] h-[340px] border-0 overflow-hidden rounded-xl"
-                />
+              {/* Native Clean QR Box */}
+              <div className="w-full flex flex-col items-center justify-center p-4 bg-zinc-950 rounded-2xl border border-zinc-800 my-2">
+                {status.qr ? (
+                  <div className="p-3 bg-white rounded-2xl shadow-xl flex flex-col items-center">
+                    <img 
+                      src={status.qr} 
+                      alt="WhatsApp Web QR Code" 
+                      className="w-56 h-56 object-contain rounded-lg"
+                    />
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-700 mt-2">
+                      <Zap size={13} className="text-emerald-600" />
+                      <span>Live QR Code • Auto Updates</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-56 h-56 flex flex-col items-center justify-center gap-3 p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
+                    <RefreshCw size={28} className="text-emerald-400 animate-spin" />
+                    <p className="text-xs text-zinc-400 font-medium">Generating WhatsApp QR Code...</p>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 mt-3">
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
+                    <span>{isRefreshing ? 'Refreshing...' : 'Refresh QR Code'}</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="w-full text-left bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-400 mt-2">
-                <p className="font-bold text-white mb-1">📋 How to Link in 5 Seconds:</p>
+              {/* Instructions */}
+              <div className="w-full text-left bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-400 mt-1">
+                <p className="font-bold text-white mb-1.5">📋 How to Link in 5 Seconds:</p>
                 <ol className="list-decimal pl-4 space-y-1">
                   <li>Open <b>WhatsApp</b> on your mobile phone.</li>
                   <li>Tap <b>Menu (⋮)</b> or <b>Settings</b> &gt; <b>Linked Devices</b>.</li>
-                  <li>Tap <b>Link a Device</b> and point camera at this QR code.</li>
+                  <li>Tap <b>Link a Device</b> and point camera at the QR code above.</li>
                 </ol>
+              </div>
+
+              {/* Individual User Fallback Notice */}
+              <div className="w-full flex items-start gap-2 bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-2.5 text-[11px] text-emerald-300/90 text-left mt-2">
+                <Info size={16} className="shrink-0 text-emerald-400 mt-0.5" />
+                <span>
+                  <b>Zero Setup Fallback:</b> Even if not linked here, LifeSensorX will always provide 1-click direct WhatsApp & SMS alerts with live GPS coordinates during an emergency.
+                </span>
               </div>
             </div>
           )}
