@@ -1,284 +1,244 @@
-# 🚨 LifeSensorX — Advanced Accident Detection & Smart Emergency Responder
+# 🚨 LifeSensorX — IoT Accident Detection & Smart Emergency Responder
 
-[![React](https://img.shields.io/badge/React-19.2-blue?logo=react&logoColor=white&style=flat-square)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org)
-[![Vite](https://img.shields.io/badge/Vite-8.0-646CFF?logo=vite&logoColor=white&style=flat-square)](https://vite.dev)
-[![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-4.0-38B2AC?logo=tailwindcss&logoColor=white&style=flat-square)](https://tailwindcss.com)
-[![Node.js](https://img.shields.io/badge/Node.js-Express-339933?logo=node.js&logoColor=white&style=flat-square)](https://nodejs.org)
-[![Socket.io](https://img.shields.io/badge/Socket.io-Realtime-black?logo=socket.io&logoColor=white&style=flat-square)](https://socket.io)
-
-**LifeSensorX** is an enterprise-grade, high-performance web ecosystem designed for **real-time vehicular accident detection, automated high-accuracy emergency alerting, and dynamic smart hospital triage queue routing**. 
-
-When a crash is detected by mobile device telematics, the application immediately initiates a high-intensity audio-visual warning. If the user is incapacitated and the countdown expires, LifeSensorX automatically acquires high-accuracy GPS coordinates, dispatches SMS alerts containing a Google Maps link to pre-configured emergency contacts, registers the victim in the hospital's live triage queue, and routes them to the nearest available medical facility.
+[![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black&style=for-the-badge)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white&style=for-the-badge)](https://www.typescriptlang.org)
+[![Vite](https://img.shields.io/badge/Vite-8.0-646CFF?logo=vite&logoColor=white&style=for-the-badge)](https://vite.dev)
+[![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-4.0-38B2AC?logo=tailwindcss&logoColor=white&style=for-the-badge)](https://tailwindcss.com)
+[![Node.js](https://img.shields.io/badge/Node.js-Express-339933?logo=node.js&logoColor=white&style=for-the-badge)](https://nodejs.org)
+[![Socket.io](https://img.shields.io/badge/Socket.io-Realtime-010101?logo=socket.io&logoColor=white&style=for-the-badge)](https://socket.io)
+[![WhatsApp Automation](https://img.shields.io/badge/WhatsApp-Free_Gateway-25D366?logo=whatsapp&logoColor=white&style=for-the-badge)](https://whatsapp.com)
+[![Twilio Voice](https://img.shields.io/badge/Twilio-AI_Voice_Calling-F22F46?logo=twilio&logoColor=white&style=for-the-badge)](https://twilio.com)
 
 ---
 
-## 📺 Live Application Preview
+## 📖 Executive Summary
 
-![LifeSensorX Triage Dashboard](public/dashboard.png)
+**LifeSensorX** is an end-to-end IoT and Cloud-enabled emergency healthcare ecosystem built to detect vehicular crashes in real time, eliminate false alarms with intelligent fail-safes, instantly broadcast live GPS coordinates to family contacts via WhatsApp and AI Voice Calls, and automatically triage the victim into the nearest hospital's trauma ward queue.
 
 ---
 
-## 📊 Complete System Flow & Technical Architecture
+## 🖥️ Present Website & System UI Showcase
 
-The following diagram outlines the complete end-to-end telemetry pipeline, alerting protocol, and real-time backend synchronization flows:
+| 🛡️ Accident Protection Dashboard | 🏥 Live Hospital Triage & Bed Management |
+| :---: | :---: |
+| ![LifeSensorX Dashboard](public/dashboard.png) | **Hospital Portal (`/hospital`)** with real-time queue & bed tracking |
+
+### 📱 Live System Modules:
+1. **User Protection Client (`/`)**: Real-time IoT hardware telemetry status, siren audio arming, emergency contacts manager, and 1-click test triggers.
+2. **Emergency Fail-Safe Modal**: 10-second audible & vibrational countdown with a prominent **"I'M SAFE"** cancellation button.
+3. **In-App WhatsApp Gateway Scanner**: Interactive QR code modal on the dashboard allowing any user to link their WhatsApp in 5 seconds.
+4. **Hospital Admin Portal (`/hospital`)**: Real-time trauma triage queue, AI wait-time calculator, and live ICU/Emergency bed allocation.
+
+---
+
+## 🔄 Complete Hardware-to-Software Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Client ["📱 Client Application (React/Zustand)"]
-        A[Start Monitoring] --> B[Device Motion Sensor Check]
-        B -- "Collision Impact Triggered" --> C[Play Loud Alarm + Vibrate]
-        C --> D[10-Second Fail-Safe Countdown]
-        
-        D -- "User Dismisses (I'm Safe)" --> A
-        
-        D -- "Countdown Expiry" --> E[Acquire High-Accuracy GPS Coordinates]
-        E --> F[API Request to Backend /send-alert]
-        E --> G[Query Resilient Hospital Finder]
+    subgraph HW ["🏎️ Hardware Layer (Vehicle / Helmet / Wearable)"]
+        H1[ESP32 Microcontroller] --> H2[MPU6050 / MPU6500 6-Axis Sensor]
+        H2 -->|Calculates G-Force Acceleration & Gyro Rotation| H1
+        H1 -->|HTTP POST Telemetry & Crash Event /api/device/crash| BE
     end
 
-  subgraph Backend ["📡 Backend Server (Node.js/Express/WebSockets)"]
-        F --> H[Format Phone Numbers & Parse SMS Template]
-        H --> I[Dispatch Bulk SMS via Fast2SMS Gateway]
-        
-        G --> J{API Key Active?}
-        J -- "Yes" --> K[Google Places API Search Nearby]
-        J -- "No/Quota Exceeded" --> L[Live OpenStreetMap Overpass API]
-        L -- "Fails/Timeout" --> M[Offline Mock Backup Data]
-        
-        K & L & M --> N[Send Hospital List to Client]
-        E --> O[Add User to Hospital Live Triage Queue]
-        O --> P[Emit WebSocket Broadcast to Admin Dashboard]
+    subgraph Mobile ["📱 Mobile Device Alternative"]
+        M1[HTML5 DeviceMotion Sensor API] -->|Severe Impact Detected| FE
     end
 
-    subgraph Hospital ["🏥 Hospital Portal (Live Triage Panel)"]
-        P --> Q[Instant UI Queue Injection]
-        Q --> R[Real-time Bed Allocation & Doctor Updates]
-        R --> S[Recalculate Dynamic Waiting Time Predictions]
+    subgraph FE ["💻 Frontend Client (React 19 / TypeScript / Zustand)"]
+        FE1[Accident Protection Active] --> FE2[Loud Siren Audio + Vibration Alarm]
+        FE2 --> FE3{10s Fail-Safe Countdown}
+        FE3 -- "User Taps 'I'M SAFE'" --> FE4[Dismiss & Prevent False Alerts]
+        FE3 -- "Countdown Expires (Incapacitated Victim)" --> FE5[Acquire High-Accuracy GPS Coordinates]
+        FE5 -->|POST /send-alert| BE
+    end
+
+    subgraph BE ["📡 Backend Engine (Node.js / Express / Socket.io)"]
+        BE --> B1[10s Cooldown Debounce Protection]
+        BE --> B2[Socket.io Real-Time Broadcast]
+        
+        B2 -->|Emit 'crashDetected'| FE
+        B2 -->|Emit 'queueUpdate'| HP
+        
+        BE --> D1[Baileys WhatsApp Gateway: Free Automated Message]
+        BE --> D2[Twilio AI Voice Engine: Spoken Hindi Call]
+        BE --> D3[Google Places API + AI Hospital Ranking]
+    end
+
+    subgraph Dispatch ["📢 Automated Emergency Multi-Dispatch"]
+        D1 -->|Sends Live Google Maps Link| R1[👨‍👩‍👦 Emergency Family Contacts]
+        D2 -->|Places Automated Hindi Voice Call| R1
+    end
+
+    subgraph HP ["🏥 Hospital Triage Center (Live Portal /hospital)"]
+        HP --> Q1[Auto-Inject Patient into Live Queue Table]
+        HP --> Q2[Dynamic AI Wait-Time Prediction]
+        HP --> Q3[ICU & Emergency Ward Bed Allocation]
     end
 ```
 
 ---
 
-## 🚀 Key System Features (In-Depth Explanation)
+## ⚙️ How It Works: Step-by-Step Pipeline
 
-### 1. 📱 Device Telematics & Intelligent Crash Detection
-* **High-Frequency $G$-Force Monitoring**: Leverages the HTML5 **DeviceMotion API** to sample real-time device accelerometer changes. It dynamically listens for severe impact forces (extreme velocity changes) representing a vehicular collision.
-* **10-Second Alarm Countdown**: To eliminate false alerts (e.g. dropping the phone), a high-intensity red modal is presented alongside a loud looping alarm siren and rhythmic vibration pulses. 
-* **User Override Hook**: The user can dismiss the emergency state instantly by tapping **"I'M SAFE"**, which immediately stops the alarm, restores device sensor listening, and prevents emergency contact alerting.
+### 1️⃣ Hardware Detection (ESP32 + MPU6050/6500)
+- The ESP32 reads 3-axis linear acceleration ($a_x, a_y, a_z$) and angular velocity ($g_x, g_y, g_z$).
+- It computes the overall impact magnitude:
+  $$\text{Magnitude} = \sqrt{a_x^2 + a_y^2 + a_z^2}$$
+- When impact exceeds safety thresholds, ESP32 transmits a JSON payload to `POST /api/device/crash`.
+- The server applies a **10-second debounce filter** to prevent duplicate alert storms.
 
-### 2. 📡 Resilient Multi-Channel Emergency Alerting
-* **Automated Background SMS**: If the fail-safe timer runs out, the client instantly fetches high-accuracy GPS coordinates and POSTs to the server, which formats the message and dispatches a background alert SMS via the **Fast2SMS Bulk Gateway** to all registered contacts.
-* **Smart Client Fallbacks**: If the server API is offline or if emergency contacts are unconfigured, the app falls back to opening native client protocols:
-  * **WhatsApp Integration**: Creates pre-filled location templates using the custom `whatsapp://send` URI scheme to bypass manual typing and send coordinates instantly.
-  * **Native SMS App Launcher**: Aggregates all contact phone numbers in a comma-separated list to auto-populate the system's native SMS application with the ready-to-send maps link.
+### 2️⃣ 10-Second Fail-Safe Countdown
+- Upon receiving the crash signal, the frontend triggers a high-intensity red screen, loud looping audio siren via Web Audio API, and rhythmic vibration.
+- If it was an accidental drop, the user taps **"I'M SAFE"** within 10 seconds to stop all actions.
 
-### 3. 🏥 Resilient 3-Tier Hospital Locator Engine
-* **10 KM Scan Boundary**: Scans the coordinates' radius to compile a list of trauma facilities.
-* **Tier 1 (Google Places API - New & Classic)**: The server queries Google's latest text/nearby search indices to retrieve the top 5 medical centers, acquiring detailed metadata like international telephone numbers, ratings, and exact directions.
-* **Tier 2 (OpenStreetMap Overpass API Fallback)**: If Google Places API credentials are not provided or the quota is exhausted, the server seamlessly performs a direct HTTP query to OpenStreetMap Overpass API nodes. This requires no API keys and yields real local coordinates.
-* **Tier 3 (Mock Sandboxing Data)**: Used for isolated offline testing to guarantee that the application never breaks.
-* **Haversine Distance Computing**: On receiving the hospital list, the client calculates the precise line-of-sight distance using the Haversine formula:
-  $$d = 2R \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta \phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta \lambda}{2}\right)}\right)$$
-* **Actionable Routing & Dialing**: Users can tap **"Call Now"** to execute a native phone hook (`tel:...`) or **"Directions"** to launch Google Maps navigation directly to the hospital entrance.
+### 3️⃣ Automated Multi-Channel Emergency Dispatch
+If the countdown expires (victim incapacitated):
+- **High-Accuracy GPS Fetch**: Coordinates are acquired via HTML5 Geolocation API (`enableHighAccuracy: true`).
+- **100% Free Automated WhatsApp Dispatch**: Server sends an automatic WhatsApp alert with a clickable Google Maps link (`https://maps.google.com/?q=lat,lng`) using the integrated **Baileys Web Gateway**.
+- **Twilio AI Voice Call**: Twilio places an automated phone call to registered contacts, speaking in Hindi:
+  > *"सावधान! यह लाइफ सेंसर एक्स से एक आपातकालीन संदेश है। मरीज का गंभीर एक्सीडेंट डिटेक्ट हुआ है..."*
 
-### 4. ⚡ Real-Time WebSocket Hospital Dashboard & Patient Triage Queue
-* **Instant Triage Registration**: On crash detection, the backend automatically posts a new patient record into the live triage queue (`/api/queue`) with a status of `WAITING` and `severity: "CRITICAL"`.
-* **Socket.io Sync Engine**: Broadcasts live updates (`queueUpdate` and `hospitalUpdate` events) to all connected clients and the admin hospital dashboard. This allows trauma wards to view incoming crash victims instantly as they are being transported.
-* **Smart Wait-Time Prediction Algorithm**: Calculates estimated wait times in minutes for every incoming patient dynamically using the following criteria:
-  * Base consultation time per patient is set to **15 minutes**.
-  * Patients are weighted by medical urgency: `CRITICAL: 4`, `HIGH: 3`, `MEDIUM: 2`, `LOW: 1`.
-  * The system computes patient position ahead of the current record based on FCFS (First Come, First Served) and severity levels, scaling it by available doctors:
-    $$\text{Wait Time} = \lceil \frac{\text{Patients Ahead} \times 15}{\text{Available Doctors}} \rceil$$
-
-### 5. 🛏️ Hospital Resource Manager
-* **Bed Ward Tracking**: Keeps a real-time count of total, occupied, and available beds across General, Emergency, and ICU wards.
-* **Live Allocation Controls**: Allows hospital administration staff to allocate or free bed resources on the fly, immediately broadcasting the modified numbers to the emergency client interface.
+### 4️⃣ Smart Hospital Discovery & AI Queue Triage
+- **3-Tier Locator Engine**: Queries Google Places API $\to$ OpenStreetMap Overpass $\to$ Haversine Distance computation to find top trauma centers within 10 km.
+- **Instant Patient Admission**: The backend registers the victim in the hospital's live triage database (`/api/queue`) with `severity: "CRITICAL"`.
+- **Dynamic AI Wait-Time Formula**:
+  $$\text{Estimated Wait Time} = \left\lceil \frac{\text{Weighted Patients Ahead} \times 15}{\text{Available Doctors}} \right\rceil$$
 
 ---
 
-## 🔌 API Reference & Documentation
+## 🛠️ Technology Stack Breakdown
 
-### 1. Send Emergency SMS
-* **Endpoint**: `POST /send-alert`
-* **Content-Type**: `application/json`
-* **Request Payload**:
+| Layer | Component | Details |
+| :--- | :--- | :--- |
+| **Hardware** | Microcontroller & Sensors | ESP32, MPU6050, MPU6500 (I2C Protocol, JSON Telemetry) |
+| **Frontend** | Framework & UI | React 19, TypeScript, Vite, Tailwind CSS, Framer Motion, Lucide Icons |
+| **State** | Client Store | Zustand with persistent `LocalStorage` synchronization |
+| **Backend** | Server Engine | Node.js, Express.js, Socket.io (WebSocket Streaming) |
+| **WhatsApp** | Automation Gateway | `@whiskeysockets/baileys` (Multi-Device WebSocket Engine), `qrcode` |
+| **Voice & SMS** | Telephony APIs | Twilio Voice (TwiML Polly.Aditi), Fast2SMS Bulk Gateway |
+| **Geocoding** | Maps & Routing | Google Places API (New & Classic), Google Maps Directions, OpenStreetMap |
+
+---
+
+## 🚀 Quick Start & Installation
+
+### Prerequisites
+- **Node.js** (v18.x or above)
+- **npm** (v9.x or above)
+- **Git**
+
+---
+
+### Step 1: Clone Repository & Install Dependencies
+```bash
+# Clone repository
+git clone https://github.com/its-Sittu/LifeSensorX.git
+cd LifeSensorX
+
+# Install client dependencies
+npm install
+
+# Install server dependencies
+cd server
+npm install
+cd ..
+```
+
+---
+
+### Step 2: Configure Environment Variables
+Inside the `server/` directory, create a `.env` file:
+```env
+PORT=5000
+NODE_ENV=production
+
+# Twilio AI Voice Credentials
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=your_twilio_phone_number
+TWILIO_WHATSAPP_NUMBER=whatsapp:+17372508034
+
+# SMS & Maps API Keys
+FAST2SMS_API_KEY=your_fast2sms_api_key_here
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
+
+---
+
+### Step 3: Run the Application
+
+**1. Start the Backend Server:**
+```bash
+cd server
+node index.js
+```
+*Console output:*
+`🚀 Emergency Backend running on port 5000`  
+`📲 [WhatsApp Gateway] Starting Baileys...`
+
+**2. Start the Frontend Client (in a separate terminal):**
+```bash
+npm run dev
+```
+*Console output:*
+`➜ Local: http://localhost:5173/`
+
+---
+
+## 📲 WhatsApp Gateway Setup in 5 Seconds
+
+1. Open **LifeSensorX Dashboard** (`http://localhost:5173`) and click **`📲 WhatsApp Gateway (Scan / Status)`** (or visit `http://localhost:5000/api/whatsapp/qr`).
+2. Open **WhatsApp** on your mobile phone $\to$ **Menu (⋮)** $\to$ **Linked Devices** $\to$ **Link a Device**.
+3. Scan the on-screen QR Code.
+4. **Done!** The status will display **`CONNECTED & READY`**. All future emergency alerts will dispatch automatically from your linked WhatsApp!
+
+---
+
+## 📡 API Reference & Endpoints
+
+### 1. Emergency Alert Dispatch
+- **Endpoint:** `POST /send-alert`
+- **Request Body:**
   ```json
   {
-    "contacts": ["+919876543210"],
+    "contacts": ["+918789812990"],
     "latitude": 28.6139,
     "longitude": 77.2090
   }
   ```
-* **Response (Success)**:
+- **Action:** Dispatches automated WhatsApp message with Google Maps link, executes Twilio AI Voice Call, and alerts hospital queue.
+
+### 2. ESP32 Hardware Crash Telemetry
+- **Endpoint:** `POST /api/device/crash`
+- **Request Body:**
   ```json
   {
-    "success": true,
-    "message": "Emergency SMS sent successfully",
-    "request_id": "req_8372648"
+    "deviceId": "ESP32_HELMET_01",
+    "ax": 5.21, "ay": 1.14, "az": 9.81,
+    "gx": 2.1, "gy": 0.8, "gz": 0.3,
+    "crashDetected": true,
+    "magnitude": 11.2
   }
   ```
 
-### 2. Fetch Nearby Hospitals
-* **Endpoint**: `GET /nearby-hospitals`
-* **Query Parameters**: `lat` (latitude), `lng` (longitude), `query` (optional manual text search)
-* **Response (Success - Google Places Fallback)**:
-  ```json
-  {
-    "success": true,
-    "source": "google_new",
-    "results": [
-      {
-        "name": "Max Super Speciality Hospital, Saket",
-        "address": "1 2, Press Enclave Marg, Saket, New Delhi",
-        "location": { "lat": 28.5275, "lng": 77.2119 },
-        "phone": "+91 11 2651 5050"
-      }
-    ]
-  }
-  ```
-
-### 3. Retrieve Live Hospital Statuses
-* **Endpoint**: `GET /api/hospitals`
-* **Response (Success)**:
-  ```json
-  {
-    "success": true,
-    "data": [
-      {
-        "_id": "hosp_1",
-        "name": "Central General Hospital",
-        "beds": {
-          "total": 100, "occupied": 50, "available": 50,
-          "icu": { "total": 20, "occupied": 15, "available": 5 },
-          "emergency": { "total": 10, "occupied": 8, "available": 2 }
-        },
-        "doctorsAvailable": 5,
-        "emergencySupport": true
-      }
-    ]
-  }
-  ```
-
-### 4. Update Bed Ward Counts
-* **Endpoint**: `PUT /api/hospitals/:id/beds`
-* **Request Payload**:
-  ```json
-  {
-    "type": "icu",
-    "action": "allocate"
-  }
-  ```
-* **Response (Success)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "total": 100, "occupied": 51, "available": 49,
-      "icu": { "total": 20, "occupied": 16, "available": 4 },
-      "emergency": { "total": 10, "occupied": 8, "available": 2 }
-    }
-  }
-  ```
-
-### 5. Add Patient to Triage Queue
-* **Endpoint**: `POST /api/queue`
-* **Request Payload**:
-  ```json
-  {
-    "name": "Jane Doe",
-    "severity": "CRITICAL",
-    "consultationType": "TRAUMA"
-  }
-  ```
-* **Response (Success)**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "_id": "pat_1780046160000",
-      "name": "Jane Doe",
-      "severity": "CRITICAL",
-      "status": "WAITING",
-      "consultationType": "TRAUMA",
-      "arrivalTime": "2026-05-29T09:17:30.000Z",
-      "estimatedWaitTime": 0
-    }
-  }
-  ```
+### 3. WhatsApp Gateway Control
+- `GET /api/whatsapp/qr`: Interactive in-browser QR Code dashboard
+- `GET /api/whatsapp/status`: Returns `{ isConnected, connectedUser, hasQr }`
+- `GET /api/whatsapp/test?phone=8789812990`: Sends test emergency alert
+- `ALL /api/whatsapp/logout`: Disconnects session and generates fresh QR code
 
 ---
 
-## 🛠️ Technology Stack Detail
+## 🛡️ Fail-Safe Protection & Privacy
 
-* **Frontend Framework**: React 19 (for high-speed declarative state rendering)
-* **Type Safety**: TypeScript 6 (enforcing data contracts for maps and triage data structures)
-* **Build System & Performance**: Vite 8 (with hot-module reloading and rapid asset pre-bundling)
-* **Styling**: Tailwind CSS 4 (custom glassmorphism utilities and responsive dark-mode variables)
-* **State Management**: Zustand (lightweight central client store with persistent local storage caching for emergency contacts)
-* **Backend Runtime**: Node.js & Express (minimal, high-throughput REST API serving routes and fallback mechanisms)
-* **Bi-directional Event Streaming**: Socket.io (WebSocket wrappers for instant patient updates)
-* **HTTP Client**: Axios (configured with request limits and timeout catch rules)
-* **Icon Assets**: Lucide React
+- **Zero False Alarms**: The 10-second fail-safe countdown prevents accidental alerts when a phone or helmet is dropped.
+- **Private & Sandboxed**: Emergency contacts are saved locally on the client device using persistent Zustand LocalStorage.
+- **Multi-Gateway Redundancy**: If one channel is unavailable, LifeSensorX concurrently engages WhatsApp Web, Twilio Voice Calling, and native mobile SMS protocols.
 
 ---
 
-## ⚙️ Quick Start & Setup Guide
+## 👨‍💻 Author & Acknowledgements
 
-### Prerequisites
-* **Node.js** (v18.x or above)
-* **npm** (v9.x or above)
-
-### Step 1: Clone the Repository & Install Root Dependencies
-```bash
-git clone https://github.com/its-Sittu/LifeSensorX.git
-cd LifeSensorX
-npm install
-```
-
-### Step 2: Configure Environment Variables
-Inside the `server/` directory, create a `.env` file:
-```bash
-cd server
-touch .env
-```
-Populate the configuration variables as follows:
-```env
-PORT=5000
-FAST2SMS_API_KEY=your_fast2sms_api_key_here
-GOOGLE_MAPS_API_KEY=your_google_places_api_key_here
-```
-
-### Step 3: Launch the Backend Server
-```bash
-node index.js
-```
-*Verification output:* `🚀 Emergency Backend running on port 5000`
-
-### Step 4: Launch the Frontend App
-Open a separate terminal window at the project root directory and run:
-```bash
-npm run dev
-```
-*Verification output:* `➜  Local:   https://localhost:5173/`
-
----
-
-## 🔒 Privacy & Offline Security Model
-
-* **Sandboxed Storage**: Emergency contacts, local logs, and alert configurations are cached locally inside the client's web browser environment using the persistent **Zustand LocalStorage** middleware. Zero contact lists or location tracking histories are harvested or uploaded to remote databases.
-* **Isolated Telemetry**: High-frequency accelerations are processed strictly on-device. No telemetry is transmitted to the server until a crash threshold is crossed and the countdown runs out.
-
----
-
-## 📱 Real-Time Mobile Device Testing
-
-1. Connect your hosting computer and smartphone to the **same Wi-Fi network**.
-2. Identify the custom Vite HTTPS local network address in your console (e.g. `https://192.168.1.15:5173/`).
-3. Load the URL on your mobile phone's browser.
-4. **Grant permissions** to both the **device motion/accelerometer sensors** and **geolocation coordinates** when prompted.
-5. Shake the device vigorously to simulate a collision force, listening for the siren and watching the triage countdown activate!
-
----
-
-Developed with ❤️ by [Sittu](https://github.com/its-Sittu)
+Developed with ❤️ by **[Sittu Kumar Singh](https://github.com/its-Sittu)**  
+*LifeSensorX — Saving Lives Through Smart IoT Telematics & Rapid Emergency Response.*
