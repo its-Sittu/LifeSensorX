@@ -37,45 +37,45 @@ Here is the actual interface of the **LifeSensorX** system in operation:
 
 ```mermaid
 flowchart TD
-    subgraph HW ["🏎️ Hardware Layer (Vehicle / Helmet / Wearable)"]
-        H1[ESP32 Microcontroller] -->|I2C Protocol| H2[MPU6050 / MPU6500 6-Axis IMU]
+    subgraph HW ["🏎️ Hardware Layer - Vehicle / Helmet / Wearable"]
+        H1["ESP32 Microcontroller"] -->|I2C Protocol| H2["MPU6050 / MPU6500 6-Axis IMU"]
         H2 -->|Linear Acceleration & Angular Velocity| H1
-        H1 -->|Calculates Impact Vector Magnitude| H3{Magnitude >= 3.5G & Gyro >= 250 deg/s?}
-        H3 -- "Crash Detected" --> H4[Transmit JSON HTTP POST /api/device/crash]
+        H1 -->|Calculates Impact Vector Magnitude| H3{"Magnitude >= 3.5G and Gyro >= 250 deg/s"}
+        H3 -->|Crash Detected| H4["Transmit JSON HTTP POST /api/device/crash"]
     end
 
     subgraph Mobile ["📱 Mobile Device Fallback"]
-        M1[HTML5 DeviceMotion Sensor API] -->|Impact / Sudden Drop| M2[Triggers Frontend Accident State]
+        M1["HTML5 DeviceMotion Sensor API"] -->|Impact / Sudden Drop| M2["Triggers Frontend Accident State"]
     end
 
-    subgraph FE ["💻 Frontend Client (React 19 / TypeScript / Zustand)"]
-        H4 -->|Socket.io 'crashDetected'| FE1[Activate Emergency Siren & UI Alarm]
+    subgraph FE ["💻 Frontend Client - React 19 / TypeScript / Zustand"]
+        H4 -->|Socket.io crashDetected| FE1["Activate Emergency Siren & UI Alarm"]
         M2 --> FE1
-        FE1 --> FE2{10s Fail-Safe Countdown}
-        FE2 -- "User Taps 'I'M SAFE'" --> FE3[Dismiss Siren & Abort Alert]
-        FE2 -- "Countdown Finishes (Victim Incapacitated)" --> FE4[Fetch GPS Geolocation Coordinates]
-        FE4 -->|POST /send-alert| BE[Node.js / Express Backend]
+        FE1 --> FE2{"10s Fail-Safe Countdown"}
+        FE2 -->|User Taps 'I'M SAFE'| FE3["Dismiss Siren & Abort Alert"]
+        FE2 -->|Countdown Finishes - Victim Incapacitated| FE4["Fetch GPS Geolocation Coordinates"]
+        FE4 -->|POST /send-alert| BE["Node.js / Express Backend Engine"]
     end
 
     subgraph BE_Layer ["📡 Backend Processing & Automation Engine"]
-        BE --> B1[10s Cooldown Debounce Protection]
-        BE --> B2[Multi-Channel Emergency Dispatcher]
+        BE --> B1["10s Cooldown Debounce Protection"]
+        BE --> B2["Multi-Channel Emergency Dispatcher"]
         
-        B2 --> W1[Baileys Free WhatsApp Gateway]
-        B2 --> V1[Twilio AI Voice Engine (Polly.Aditi Hindi)]
-        B2 --> S1[Fast2SMS Fallback API]
-        B2 --> H_Rank[Hospital Discovery & Haversine Distance Engine]
+        B2 --> W1["Baileys Free WhatsApp Gateway"]
+        B2 --> V1["Twilio AI Voice Engine - Polly.Aditi Hindi"]
+        B2 --> S1["Fast2SMS Fallback API"]
+        B2 --> H_Rank["Hospital Discovery & Haversine Engine"]
     end
 
     subgraph Dispatch ["📢 Automated Multi-Channel Broadcast"]
-        W1 -->|Sends WhatsApp Message + Google Maps Pin| C1[👨‍👩‍👧 Family Emergency Contacts]
+        W1 -->|Sends WhatsApp Message + Google Maps Pin| C1["👨‍👩‍👧 Family Emergency Contacts"]
         V1 -->|Automated Voice Call Speaking Hindi Alert| C1
     end
 
-    subgraph Hospital ["🏥 Hospital Trauma Center (/hospital)"]
-        H_Rank --> HQ1[Auto-Admit Patient into Queue with 'CRITICAL' Severity]
-        HQ1 --> HQ2[Dynamic AI Wait-Time Prediction Formula]
-        HQ2 --> HQ3[ICU & Emergency Ward Bed Allocation]
+    subgraph Hospital ["🏥 Hospital Trauma Center - /hospital"]
+        H_Rank --> HQ1["Auto-Admit Patient with CRITICAL Severity"]
+        HQ1 --> HQ2["Dynamic AI Wait-Time Prediction Formula"]
+        HQ2 --> HQ3["ICU & Emergency Ward Bed Allocation"]
     end
 ```
 
